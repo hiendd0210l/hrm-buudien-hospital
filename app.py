@@ -14,23 +14,22 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON POSTGRESQL
+# 2. KẾT NỐI DATABASE NEON POSTGRESQL (DÙNG DATABASE_URL)
 # ---------------------------------------------------------
 @st.cache_resource
 def get_db_engine():
     try:
-        if "host" not in st.secrets:
-            st.warning("⚠️ Chưa cấu hình Secrets trên Streamlit Cloud. Vui lòng kiểm tra lại phần Settings -> Secrets.")
+        # Kiểm tra nếu chưa cấu hình DATABASE_URL trong secrets
+        if "DATABASE_URL" not in st.secrets:
+            st.warning("⚠️ Chưa cấu hình DATABASE_URL trong Secrets trên Streamlit Cloud.")
             return None
             
-        user = st.secrets["user"]
-        password = st.secrets["password"]
-        host = st.secrets["host"]
-        port = st.secrets["port"]
-        database = st.secrets["database"]
+        db_url = st.secrets["DATABASE_URL"]
         
-        # Chuỗi kết nối chuẩn SQLAlchemy cho Neon PostgreSQL (yêu cầu SSL)
-        db_url = f"postgresql://{user}:{password}@{host}:{port}/{database}?sslmode=require"
+        # Sửa lại tiền tố nếu Neon/Heroku trả về postgres:// thay vì postgresql://
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+            
         engine = create_engine(db_url)
         return engine
     except Exception as e:
@@ -39,7 +38,7 @@ def get_db_engine():
 
 engine = get_db_engine()
 
-# Khởi tạo bảng dữ liệu trên Neon DB nếu chưa tồn tại
+# Khởi tạo bảng dữ liệu cán bộ trên Neon DB nếu chưa tồn tại
 def init_db():
     if engine:
         try:
@@ -73,7 +72,7 @@ menu = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Hỗ trợ:** Kết nối dữ liệu thời gian thực với Neon Console Database.")
+st.sidebar.info("💡 **Kết nối:** Dữ liệu thời gian thực đồng bộ với Neon PostgreSQL Database.")
 
 # ---------------------------------------------------------
 # TAB 1: DASHBOARD & CẢNH BÁO
@@ -102,7 +101,6 @@ if menu == "Dashboard & Cảnh báo":
     
     st.warning("🔔 **Thông báo:** Có 8 cán bộ quá hạn giữ chức vụ bổ nhiệm & 12 cán bộ sắp hết hạn Hợp đồng lao động!")
     
-    # Bảng mẫu danh sách cảnh báo
     data_canh_bao = {
         "Mã CB": ["CB001", "CB045", "CB112", "CB090"],
         "Họ và Tên": ["BS. Nguyễn Văn A", "ThS. Trần Thị B", "CN. Lê Văn C", "BSCKII. Phạm Hoàng D"],
@@ -138,9 +136,8 @@ elif menu == "Hồ sơ Cán bộ":
                     ]
                 
                 if df_can_bo.empty:
-                    st.info("Chưa có dữ liệu cán bộ. Bạn hãy chuyển sang tab 'Thêm Cán bộ Mới' để nhập dữ liệu.")
+                    st.info("Chưa có dữ liệu cán bộ trong CSDL Neon. Bạn hãy chuyển sang tab 'Thêm Cán bộ Mới' để nhập dữ liệu.")
                 else:
-                    # Hiển thị bảng
                     st.dataframe(
                         df_can_bo.rename(columns={
                             "ma_cb": "Mã CB",
@@ -154,7 +151,6 @@ elif menu == "Hồ sơ Cán bộ":
                         use_container_width=True
                     )
                     
-                    # Nút Xuất CSV/Excel
                     csv_data = df_can_bo.to_csv(index=False).encode('utf-8-sig')
                     st.download_button(
                         label="📥 Tải về danh sách Cán bộ (File CSV)",
