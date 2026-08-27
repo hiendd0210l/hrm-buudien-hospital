@@ -1,0 +1,8 @@
+streamlit==1.38.0
+streamlit-option-menu
+pandas
+plotly
+sqlalchemy
+psycopg2-binary
+python-docx
+openpyxl
