@@ -38,7 +38,46 @@ def init_db():
             conn.commit()
 
 init_db()
+# ---------------------------------------------------------
+# KẾT NỐI DATABASE NEON POSTGRESQL AN TOÀN
+# ---------------------------------------------------------
+@st.cache_resource
+def get_db_engine():
+    try:
+        if "postgres" not in st.secrets:
+            st.error("Chưa cấu hình Secrets [postgres] trên Streamlit Cloud!")
+            return None
+        
+        db_config = st.secrets["postgres"]
+        db_url = f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}?sslmode=require"
+        engine = create_engine(db_url)
+        return engine
+    except Exception as e:
+        st.error(f"Lỗi cấu hình CSDL: {e}")
+        return None
 
+engine = get_db_engine()
+
+def init_db():
+    if engine:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS can_bo (
+                        ma_cb VARCHAR(20) PRIMARY KEY,
+                        ho_ten VARCHAR(100) NOT NULL,
+                        chuc_danh VARCHAR(50),
+                        khoa_phong VARCHAR(100),
+                        loai_nhan_su VARCHAR(50),
+                        so_dienthoai VARCHAR(15),
+                        trang_thai VARCHAR(20) DEFAULT 'Đang làm việc'
+                    );
+                """))
+                conn.commit()
+        except Exception as e:
+            st.warning(f"Không thể kết nối CSDL Neon. Vui lòng kiểm tra lại thông tin Secrets! Chi tiết: {e}")
+
+init_db()
 # ---------------------------------------------------------
 # 2. CẤU HÌNH GIAO DIỆN STREAMLIT
 # ---------------------------------------------------------
