@@ -1,2 +1,2 @@
-freefont-ttf
+fonts-freefont-ttf
 graphviz
