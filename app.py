@@ -278,7 +278,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
 
-    # TAB 1: DANH SÁCH & XÓA
+   # TAB 1: DANH SÁCH & XÓA
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -321,7 +321,12 @@ def render_quan_ly_can_bo():
                 label = f"{mcb} - {hoten} ({khoa})"
                 options_del[label] = row['id']
                 
-            selected_del_label = col_del1.selectbox("Chọn nhân sự muốn xóa:", list(options_del.keys()), key="select_del")
+            # Đặt key rõ ràng cho selectbox để quản lý state dễ dàng
+            selected_del_label = col_del1.selectbox(
+                "Chọn nhân sự muốn xóa:", 
+                list(options_del.keys()), 
+                key="select_target_del"
+            )
             target_id = options_del[selected_del_label]
 
             if col_del2.button("🗑️ Xóa nhân sự", use_container_width=True):
@@ -335,8 +340,11 @@ def render_quan_ly_can_bo():
                     st.success(f"Đã xóa thành công [{selected_del_label}]!")
                     st.rerun()
 
+            # Sửa lại logic nút Hủy thao tác hoạt động chính xác
             if col_del3.button("❌ Hủy thao tác", use_container_width=True):
-                st.toast("Đã hủy yêu cầu xóa nhân sự.")
+                if "select_target_del" in st.session_state:
+                    del st.session_state["select_target_del"]
+                st.toast("Đã hủy thao tác chọn nhân sự.")
                 st.rerun()
 
     # TAB 2: THÊM & SỬA
