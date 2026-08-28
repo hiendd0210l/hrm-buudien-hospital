@@ -137,7 +137,7 @@ def init_db_structure():
 
 init_db_structure()
 
-@st.cache_data(ttl=2)
+@st.cache_data(ttl=1)
 def load_data_from_db():
     if not engine:
         return pd.DataFrame()
@@ -285,7 +285,7 @@ def render_quan_ly_can_bo():
         
         if col_t2.button("🔄 Tải lại dữ liệu", use_container_width=True):
             st.cache_data.clear()
-            st.toast("🔄 Đã làm mới dữ liệu!")
+            st.toast("🔄 Đã làm mới dữ liệu từ CSDL thành công!")
             st.rerun()
 
         if col_t3.button("🧹 Xóa hết dữ liệu", use_container_width=True):
@@ -399,11 +399,11 @@ def render_quan_ly_can_bo():
                     so_cccd = c2.text_input("Số CCCD / CMND", value=str(curr_row['so_cccd'] or ''))
                     
                     chuc_danh = c1.text_input("Chức vụ", value=str(curr_row['chuc_danh'] or ''))
-                    khoa_phong = c2.text_input("Khoa / Phòng", value=str(curr_row['khoa_phong'] or ''))
-                    trinh_do = c1.text_input("Trình độ chuyên môn", value=str(curr_row['trinh_do'] or ''))
+                    khoa_phong = c1.text_input("Khoa / Phòng", value=str(curr_row['khoa_phong'] or ''))
+                    trinh_do = c2.text_input("Trình độ chuyên môn", value=str(curr_row['trinh_do'] or ''))
                     
-                    sdt = c2.text_input("Số điện thoại", value=str(curr_row['so_dien_thoai'] or ''))
-                    email = c1.text_input("Email", value=str(curr_row['email'] or ''))
+                    sdt = c1.text_input("Số điện thoại", value=str(curr_row['so_dien_thoai'] or ''))
+                    email = c2.text_input("Email", value=str(curr_row['email'] or ''))
                     
                     btn_update = st.form_submit_button("🔄 Cập nhật Thông tin")
                     
@@ -427,7 +427,7 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÚNG CHUẨN SƠ YẾU LÝ LỊCH 2C-BNV)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (CHUẨN XÁC ÁNH XẠ CỘT 2C-BNV)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -435,7 +435,6 @@ def render_quan_ly_can_bo():
             st.markdown("##### 📥 **1. Tải về file Excel mẫu chuẩn 2C-BNV**")
             st.caption("Mẫu chuẩn đầy đủ các trường theo Sơ yếu lý lịch Bộ Nội Vụ (BV Bưu Điện).")
             
-            # Tạo file mẫu chuẩn đúng các cột như yêu cầu mẫu kèm theo
             sample_2c_df = pd.DataFrame({
                 'Ma_NV': ['N0003', 'N0009', 'N0125'],
                 'Ho_Ten': ['Trần Hùng Mạnh', 'Phạm Thị Thanh Tú', 'Phạm Trường Giang'],
@@ -491,13 +490,12 @@ def render_quan_ly_can_bo():
             
             if uploaded_file is not None:
                 try:
-                    # Đọc sheet đầu tiên hoặc đúng tên 'Mau_2C_BNV'
                     xls_file = pd.ExcelFile(uploaded_file)
                     sheet_to_read = 'Mau_2C_BNV' if 'Mau_2C_BNV' in xls_file.sheet_names else xls_file.sheet_names[0]
                     df_up = pd.read_excel(uploaded_file, sheet_name=sheet_to_read)
                     
                     st.markdown(f"**Xem trước dữ liệu (Tổng số dòng: {len(df_up)}):**")
-                    st.dataframe(df_up.head(5), use_container_width=True, hide_index=True)
+                    st.dataframe(df_up.head(3), use_container_width=True, hide_index=True)
                     
                     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -505,26 +503,27 @@ def render_quan_ly_can_bo():
                         count_inserted = 0
                         col_list = list(df_up.columns)
                         
-                        def get_exact_val(row_item, col_name):
-                            if col_name in col_list:
-                                val = row_item[col_name]
+                        def get_val(row_item, key):
+                            if key in col_list:
+                                val = row_item[key]
                                 if pd.notna(val):
-                                    s_val = str(val).strip()
-                                    if s_val.lower() not in ['nan', 'none', '', 'null']:
-                                        if s_val.endswith('.0'):
-                                            s_val = s_val[:-2]
-                                        return s_val
+                                    s = str(val).strip()
+                                    if s.lower() not in ['nan', 'none', '', 'null']:
+                                        if s.endswith('.0'):
+                                            s = s[:-2]
+                                        return s
                             return None
 
                         with engine.connect() as conn:
                             for idx, row in df_up.iterrows():
                                 try:
-                                    h_val = get_exact_val(row, 'Ho_Ten')
+                                    h_val = get_val(row, 'Ho_Ten')
                                     if not h_val:
                                         continue
                                         
-                                    m_val = get_exact_val(row, 'Ma_NV') or f"N{idx+1:04d}"
+                                    m_val = get_val(row, 'Ma_NV') or f"N{idx+1:04d}"
                                     
+                                    # Đọc đúng trường ngày sinh
                                     raw_ns = row.get('Ngay_Sinh')
                                     ns_val = None
                                     if pd.notna(raw_ns):
@@ -536,21 +535,26 @@ def render_quan_ly_can_bo():
                                         except Exception:
                                             ns_val = None
 
-                                    cccd_val = get_exact_val(row, 'So_CCCD')
-                                    cd_val = get_exact_val(row, 'Chuc_Vu')
-                                    kp_val = get_exact_val(row, 'Khoa_Phong')
-                                    td_val = get_exact_val(row, 'Trinh_Do_Chuyen_Mon')
-                                    sdt_val = get_exact_val(row, 'Dien_Thoai')
-                                    
-                                    # Lấy email hoặc để trống nếu không có cột email trực tiếp trong 2C
-                                    email_val = get_exact_val(row, 'Email') if 'Email' in col_list else None
+                                    cccd_val = get_val(row, 'So_CCCD')
+                                    chuc_vu_val = get_val(row, 'Chuc_Vu')
+                                    khoa_phong_val = get_val(row, 'Khoa_Phong')
+                                    trinh_do_val = get_val(row, 'Trinh_Do_Chuyen_Mon')
+                                    sdt_val = get_val(row, 'Dien_Thoai')
+                                    email_val = get_val(row, 'Email') if 'Email' in col_list else None
 
                                     conn.execute(text("""
                                         INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
-                                        VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
+                                        VALUES (:m, :h, :ns, :cccd, :cv, :kp, :td, :sdt, :email)
                                     """), {
-                                        "m": m_val, "h": h_val, "ns": ns_val, "cccd": cccd_val, 
-                                        "c": cd_val, "k": kp_val, "t": td_val, "s": sdt_val, "e": email_val
+                                        "m": m_val, 
+                                        "h": h_val, 
+                                        "ns": ns_val, 
+                                        "cccd": cccd_val, 
+                                        "cv": chuc_vu_val, 
+                                        "kp": khoa_phong_val, 
+                                        "td": trinh_do_val, 
+                                        "sdt": sdt_val, 
+                                        "email": email_val
                                     })
                                     count_inserted += 1
                                 except Exception as row_ex:
@@ -560,11 +564,11 @@ def render_quan_ly_can_bo():
                         
                         if count_inserted > 0:
                             st.cache_data.clear()
-                            st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự theo mẫu Sơ yếu lý lịch 2C-BNV vào CSDL!")
+                            st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự vào CSDL và ánh xạ đúng chuẩn các cột!")
                             st.balloons()
                             st.rerun()
                         else:
-                            st.error("❌ Không chèn được dữ liệu nào. Vui lòng kiểm tra lại cấu trúc file.")
+                            st.error("❌ Không chèn được dữ liệu. Vui lòng kiểm tra lại cấu trúc tiêu đề file Excel.")
 
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
