@@ -322,7 +322,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
     
-   # TAB 1: DANH SÁCH & XÓA (CẬP NHẬT TÍNH NĂNG HỦY THAO TÁC XÓA)
+  # TAB 1: DANH SÁCH & XÓA (ĐÃ KHẮC PHỤC LỖI HỦY THAO TÁC)
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -384,20 +384,23 @@ def render_quan_ly_can_bo():
             st.markdown("##### 🗑️ **Xóa dữ liệu cá nhân**")
             col_del1, col_del2, col_del3 = st.columns([2.5, 1, 1])
             
-            options_del = {"-- Chọn nhân sự để xóa --": None}
+            options_del = ["-- Chọn nhân sự để xóa --"]
+            mapping_del = {"-- Chọn nhân sự để xóa --": None}
+            
             for _, row in df_sorted.iterrows():
                 mcb = str(row['ma_can_bo']) if pd.notna(row['ma_can_bo']) else "N/A"
                 hoten = str(row['ho_ten']) if pd.notna(row['ho_ten']) else "N/A"
                 khoa = str(row['khoa_phong']) if pd.notna(row['khoa_phong']) else "Chưa phân khoa"
                 label = f"{mcb} - {hoten} ({khoa})"
-                options_del[label] = row['id']
+                options_del.append(label)
+                mapping_del[label] = row['id']
                 
-            selected_del_label = col_del1.selectbox("Chọn nhân sự muốn xóa:", list(options_del.keys()), key="select_del")
-            target_id = options_del[selected_del_label]
+            selected_del_label = col_del1.selectbox("Chọn nhân sự muốn xóa:", options_del, key="select_del")
+            target_id = mapping_del[selected_del_label]
             
             if col_del2.button("🗑️ Xóa nhân sự", use_container_width=True):
                 if target_id is None:
-                    st.warning("⚠️ Bạn chưa chọn nhân sự nào!")
+                    st.warning("⚠️ Bạn chưa chọn nhân sự nào để xóa!")
                 else:
                     with engine.begin() as conn:
                         conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
@@ -406,8 +409,8 @@ def render_quan_ly_can_bo():
                     st.rerun()
                     
             if col_del3.button("❌ Hủy thao tác", use_container_width=True):
-                # Reset lại giá trị của selectbox về dòng mặc định để ẩn tên nhân sự đi
-                st.session_state["select_del"] = "-- Chọn nhân sự để xóa --"
+                # Đặt lại state về vị trí đầu tiên (phần tử số 0 tương ứng với "-- Chọn nhân sự để xóa --")
+                st.session_state["select_del"] = options_del[0]
                 st.toast("Đã hủy thao tác chọn nhân sự.")
                 st.rerun()
 
