@@ -107,7 +107,7 @@ def get_db_engine():
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS can_bo (
                     id SERIAL PRIMARY KEY,
-                    ma_cb VARCHAR(50) UNIQUE,
+                    ma_cb VARCHAR(50),
                     ho_ten VARCHAR(255),
                     chuc_danh VARCHAR(100),
                     khoa_phong VARCHAR(255),
@@ -387,7 +387,7 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (XỬ LÝ TRỰC TIẾP LƯU DATABASE)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ TỐI ƯU HÓA CÂU LỆNH SQL THÍCH HỢP CHO NEON)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -430,7 +430,6 @@ def render_quan_ly_can_bo():
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
                         cols = df_up.columns.tolist()
                         
-                        # Tự động quét thông minh các cột
                         def get_col(possible_names):
                             for col in cols:
                                 c_clean = str(col).lower().replace(" ", "").replace("_", "").replace("/", "")
@@ -447,7 +446,6 @@ def render_quan_ly_can_bo():
                         c_sdt = get_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone'])
                         c_email = get_col(['email', 'mail'])
 
-                        # Nếu không map được cột tên, lấy mặc định cột 0 và 1
                         if not c_hoten and len(cols) >= 2:
                             c_macb = cols[0]
                             c_hoten = cols[1]
@@ -464,31 +462,36 @@ def render_quan_ly_can_bo():
                                 e = str(row[c_email]).strip() if c_email and pd.notna(row[c_email]) else ''
 
                                 if h and h.lower() != 'nan':
-                                    conn.execute(text("""
-                                        INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
-                                        VALUES (:m, :h, :c, :k, :t, :s, :e)
-                                        ON CONFLICT (ma_cb) DO UPDATE SET
-                                            ho_ten = EXCLUDED.ho_ten,
-                                            chuc_danh = EXCLUDED.chuc_danh,
-                                            khoa_phong = EXCLUDED.khoa_phong,
-                                            trinh_do = EXCLUDED.trinh_do,
-                                            so_dien_thoai = EXCLUDED.so_dien_thoai,
-                                            email = EXCLUDED.email;
-                                    """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                    # Kiểm tra xem mã cán bộ đã tồn tại chưa
+                                    check_res = conn.execute(text("SELECT id FROM can_bo WHERE ma_cb = :m"), {"m": m}).fetchone()
+                                    if check_res:
+                                        # Nếu đã có -> Cập nhật
+                                        conn.execute(text("""
+                                            UPDATE can_bo SET 
+                                                ho_ten = :h, chuc_danh = :c, khoa_phong = :k, 
+                                                trinh_do = :t, so_dien_thoai = :s, email = :e
+                                            WHERE ma_cb = :m
+                                        """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                    else:
+                                        # Nếu chưa có -> Thêm mới
+                                        conn.execute(text("""
+                                            INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                            VALUES (:m, :h, :c, :k, :t, :s, :e)
+                                        """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
                                     count_inserted += 1
                             
                             conn.commit()
                         
-                        st.cache_data.clear() # Xóa bộ nhớ tạm ép ứng dụng đọc lại dữ liệu mới từ Postgres
+                        st.cache_data.clear()
                         
                         if count_inserted > 0:
-                            st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự vào CSDL Neon!")
+                            st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự vào hệ thống!")
                             st.rerun()
                         else:
-                            st.error("❌ Không tìm thấy cột Họ và Tên hợp lệ. Vui lòng sử dụng File Excel Mẫu của hệ thống!")
+                            st.error("❌ Không tìm thấy thông tin Họ và Tên hợp lệ. Vui lòng thử lại!")
 
                 except Exception as e_up:
-                    st.error(f"Lỗi đọc file Excel: {e_up}")
+                    st.error(f"Lỗi nhập dữ liệu: {e_up}")
 
     # TAB 4: XUẤT EXCEL
     with tab4:
