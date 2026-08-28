@@ -195,9 +195,11 @@ def render_login():
     
     col_l, col_center, col_r = st.columns([1.8, 1.4, 1.8])
 
-    with col_center:
-        # Tải logo từ file ảnh chuẩn trong cùng thư mục
-        st.image("logo.png", width=140)
+   with col_center:
+        # Căn giữa và tăng kích thước logo
+        l_col1, l_col2, l_col3 = st.columns([1, 2, 1])
+        with l_col2:
+            st.image("logo.png", width=220)
 
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
         st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
