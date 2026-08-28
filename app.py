@@ -322,7 +322,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
     
-    # TAB 1: DANH SÁCH & XÓA
+   # TAB 1: DANH SÁCH & XÓA (ĐÃ SẮP XẾP THEO THỨ TỰ ƯU TIÊN KHOA PHÒNG)
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -345,7 +345,51 @@ def render_quan_ly_can_bo():
         if df.empty:
             st.info("Chưa có dữ liệu nhân sự trong CSDL. Bạn có thể thêm mới hoặc nhập từ file Excel mẫu 2C-BNV.")
         else:
-            display_df = df.drop(columns=['id']).copy()
+            # HÀM XÁC ĐỊNH THỨ TỰ ƯU TIÊN KHOA PHÒNG
+            def get_department_priority(kp):
+                if not kp or pd.isna(kp):
+                    return 99 # Chưa xác định cho xuống cuối
+                
+                s = str(kp).lower().strip()
+                
+                # 1. Ban Giám đốc
+                if any(x in s for x in ['giám đốc', 'hđql', 'ban giám đốc']):
+                    return 1
+                
+                # 2. Các Phòng chức năng / nghiệp vụ
+                if any(x in s for x in ['phòng', 'tổ chức', 'kế hoạch', 'tài chính', 'điều dưỡng', 'hành chính', 'quản trị', 'vật tư', 'cntt']):
+                    return 2
+                
+                # 3. Các khoa thuộc khối lâm sàng (Nội, Ngoại, Sản, Nhi, Hồi sức cấp cứu,...)
+                if any(x in s for x in ['ngoại', 'nội', 'sản', 'nhi', 'cấp cứu', 'hồi sức', 'y học cổ truyền', 'phục hồi chức năng', 'truyền nhiễm', 'da liễu', 'ung bướu']):
+                    return 3
+                
+                # 4. Khối phòng khám
+                if 'khám' in s:
+                    return 4
+                
+                # 5. Các chuyên khoa: Mắt, Tai Mũi Họng, Răng Hàm Mặt
+                if any(x in s for x in ['mắt', 'tai mũi họng', 'răng hàm mặt', 'rhm', 'tmh']):
+                    return 5
+                
+                # 6. Các khoa cận lâm sàng (Chẩn đoán hình ảnh, Nội soi, Xét nghiệm,...)
+                if any(x in s for x in ['chẩn đoán hình ảnh', 'xét nghiệm', 'nội soi', 'thăm dò chức năng', 'gây mê', 'dược', 'kiểm soát nhiễm khuẩn', 'vi sinh', 'sinh hóa']):
+                    return 6
+                
+                # 7. Các trung tâm trực thuộc
+                if 'trung tâm' in s:
+                    return 7
+                    
+                return 50 # Các khoa phòng khác nằm giữa trung gian
+
+            # Thêm cột trọng số tạm thời để sắp xếp
+            df_sorted = df.copy()
+            df_sorted['priority'] = df_sorted['khoa_phong'].apply(get_department_priority)
+            
+            # Sắp xếp theo thứ tự ưu tiên, sau đó sắp xếp theo Khoa/Phòng và Họ tên cho gọn gàng
+            df_sorted = df_sorted.sort_values(by=['priority', 'khoa_phong', 'ho_ten'], ascending=[True, True, True])
+            
+            display_df = df_sorted.drop(columns=['id', 'priority']).copy()
             display_df.columns = [
                 'Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Số CCCD', 
                 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email'
@@ -357,7 +401,7 @@ def render_quan_ly_can_bo():
             col_del1, col_del2, col_del3 = st.columns([2.5, 1, 1])
             
             options_del = {"-- Chọn nhân sự để xóa --": None}
-            for _, row in df.iterrows():
+            for _, row in df_sorted.iterrows():
                 mcb = str(row['ma_can_bo']) if pd.notna(row['ma_can_bo']) else "N/A"
                 hoten = str(row['ho_ten']) if pd.notna(row['ho_ten']) else "N/A"
                 khoa = str(row['khoa_phong']) if pd.notna(row['khoa_phong']) else "Chưa phân khoa"
