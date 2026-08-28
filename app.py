@@ -433,7 +433,7 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ TỐI ƯU LOGIC BẮT LỖI)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ LOẠI BỎ FORM, BỔ SUNG ÁNH XẠ CỘT TRỰC QUAN)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -442,7 +442,6 @@ def render_quan_ly_can_bo():
             st.caption("Hãy tải file mẫu chuẩn này để nhập dữ liệu chính xác nhất.")
             
             sample_df = pd.DataFrame({
-                'ID': [1, 2],
                 'Mã Cán bộ': ['CB001', 'CB002'],
                 'Họ và Tên': ['Nguyễn Văn A', 'Trần Thị B'],
                 'Ngày sinh': ['1990-01-15', '1992-05-20'],
@@ -468,7 +467,7 @@ def render_quan_ly_can_bo():
 
         with col_m2:
             st.markdown("##### 📤 **2. Tải lên file Excel để nhập dữ liệu**")
-            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx) để upload:", type=['xlsx', 'xls'], key="excel_uploader")
+            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx) để upload:", type=['xlsx', 'xls'], key="excel_uploader_direct")
             
             if uploaded_file is not None:
                 try:
@@ -476,56 +475,51 @@ def render_quan_ly_can_bo():
                     st.markdown(f"**Xem trước dữ liệu (Tổng số dòng: {len(df_up)}):**")
                     st.dataframe(df_up.head(5), use_container_width=True)
                     
-                    if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
-                        cols = df_up.columns.tolist()
-                        
-                        def get_col(keywords):
-                            for col in cols:
-                                norm_col = remove_vietnamese_accent(str(col))
-                                for kw in keywords:
-                                    if kw in norm_col:
-                                        return col
-                            return None
+                    # Mapping cột trực quan thông minh hơn
+                    columns_in_file = df_up.columns.tolist()
+                    
+                    st.markdown("---")
+                    st.markdown("##### 🔗 **Khớp nối cột dữ liệu từ file của bạn:**")
+                    col_map1, col_map2 = st.columns(2)
+                    
+                    # Tự động đoán tên cột gần đúng nhất
+                    def guess_index(keywords):
+                        for idx, col in enumerate(columns_in_file):
+                            norm = remove_vietnamese_accent(str(col))
+                            for kw in keywords:
+                                if kw in norm:
+                                    return idx
+                        return 0
 
-                        c_macb = get_col(['macanbo', 'mcb', 'manhanvien', 'manv', 'stt'])
-                        c_hoten = get_col(['hovaten', 'hoten', 'tencanbo', 'tennhanvien', 'fullname', 'ten'])
-                        c_ngaysinh = get_col(['ngaysinh', 'ns', 'dob', 'dateofbirth'])
-                        c_cccd = get_col(['socccd', 'cccd', 'cmnd', 'socmnd'])
-                        c_chucdanh = get_col(['chucdanh', 'chucvu', 'vitri', 'cd'])
-                        c_khoaphong = get_col(['khoaphong', 'khoa', 'phong', 'donvi'])
-                        c_trinhdo = get_col(['trinhdo', 'bangcap', 'hocluc', 'td'])
-                        c_sdt = get_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone', 'mobile'])
-                        c_email = get_col(['email', 'mail'])
+                    c_macb_sel = col_map1.selectbox("Cột chứa Mã cán bộ", columns_in_file, index=guess_index(['macanbo', 'mcb', 'manv', 'macan']))
+                    c_hoten_sel = col_map2.selectbox("Cột chứa Họ và Tên (*)", columns_in_file, index=guess_index(['hoten', 'hovaten', 'ten', 'fullname']))
+                    c_ns_sel = col_map1.selectbox("Cột chứa Ngày sinh", columns_in_file, index=guess_index(['ngaysinh', 'ns', 'dob']))
+                    c_cccd_sel = col_map2.selectbox("Cột chứa Số CCCD", columns_in_file, index=guess_index(['cccd', 'cmnd', 'socmnd']))
+                    c_cd_sel = col_map1.selectbox("Cột chứa Chức danh", columns_in_file, index=guess_index(['chucdanh', 'chucvu', 'vitri']))
+                    c_kp_sel = col_map2.selectbox("Cột chứa Khoa / Phòng", columns_in_file, index=guess_index(['khoaphong', 'khoa', 'phong']))
+                    c_td_sel = col_map1.selectbox("Cột chứa Trình độ", columns_in_file, index=guess_index(['trinhdo', 'bangcap']))
+                    c_sdt_sel = col_map2.selectbox("Cột chứa Số điện thoại", columns_in_file, index=guess_index(['sdt', 'dienthoai', 'phone']))
+                    c_email_sel = col_map1.selectbox("Cột chứa Email", columns_in_file, index=guess_index(['email', 'mail']))
 
-                        if not c_hoten and len(cols) >= 2:
-                            c_macb = cols[0]
-                            c_hoten = cols[1]
+                    st.markdown("<br>", unsafe_allow_html=True)
 
-                        def clean_str(val):
-                            if pd.isna(val) or val is None:
-                                return None
-                            s = str(val).strip()
-                            if s.lower() in ['nan', 'none', '', 'null', 'nat']:
-                                return None
-                            if s.endswith('.0'):
-                                s = s[:-2]
-                            return s
-
+                    if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True, type="primary"):
                         count_inserted = 0
                         error_logs = []
                         
                         with engine.connect() as conn:
                             for idx, row in df_up.iterrows():
                                 try:
-                                    h = clean_str(row[c_hoten]) if c_hoten and c_hoten in row else None
-                                    if not h:
+                                    h_val = str(row[c_hoten_sel]).strip() if pd.notna(row[c_hoten_sel]) else ""
+                                    if not h_val or h_val.lower() in ['nan', 'none', '']:
                                         continue
                                         
-                                    m = clean_str(row[c_macb]) if c_macb and c_macb in row else f"CB{idx+1:04d}"
-                                    if not m:
-                                        m = f"CB{idx+1:04d}"
-                                        
-                                    raw_ns = row[c_ngaysinh] if c_ngaysinh and c_ngaysinh in row else None
+                                    m_val = str(row[c_macb_sel]).strip() if pd.notna(row[c_macb_sel]) else f"CB{idx+1:04d}"
+                                    if m_val.endswith('.0'): 
+                                        m_val = m_val[:-2]
+
+                                    # Xử lý ngày sinh an toàn tuyệt đối
+                                    raw_ns = row[c_ns_sel] if c_ns_sel else None
                                     ns_val = None
                                     if pd.notna(raw_ns):
                                         try:
@@ -536,17 +530,30 @@ def render_quan_ly_can_bo():
                                         except Exception:
                                             ns_val = None
 
-                                    cccd_val = clean_str(row[c_cccd]) if c_cccd and c_cccd in row else None
-                                    c_val = clean_str(row[c_chucdanh]) if c_chucdanh and c_chucdanh in row else None
-                                    k_val = clean_str(row[c_khoaphong]) if c_khoaphong and c_khoaphong in row else None
-                                    t_val = clean_str(row[c_trinhdo]) if c_trinhdo and c_trinhdo in row else None
-                                    s_val = clean_str(row[c_sdt]) if c_sdt and c_sdt in row else None
-                                    e_val = clean_str(row[c_email]) if c_email and c_email in row else None
+                                    def get_val(col_name):
+                                        if not col_name or col_name not in row or pd.isna(row[col_name]):
+                                            return None
+                                        val = str(row[col_name]).strip()
+                                        if val.lower() in ['nan', 'none', '', 'null']:
+                                            return None
+                                        if val.endswith('.0'):
+                                            val = val[:-2]
+                                        return val
+
+                                    cccd_val = get_val(c_cccd_sel)
+                                    cd_val = get_val(c_cd_sel)
+                                    kp_val = get_val(c_kp_sel)
+                                    td_val = get_val(c_td_sel)
+                                    sdt_val = get_val(c_sdt_sel)
+                                    email_val = get_val(c_email_sel)
 
                                     conn.execute(text("""
                                         INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                         VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
-                                    """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c_val, "k": k_val, "t": t_val, "s": s_val, "e": e_val})
+                                    """), {
+                                        "m": m_val, "h": h_val, "ns": ns_val, "cccd": cccd_val, 
+                                        "c": cd_val, "k": kp_val, "t": td_val, "s": sdt_val, "e": email_val
+                                    })
                                     count_inserted += 1
                                 except Exception as row_ex:
                                     error_logs.append(f"Dòng {idx+1}: {str(row_ex)}")
@@ -555,17 +562,15 @@ def render_quan_ly_can_bo():
                         
                         if count_inserted > 0:
                             st.cache_data.clear()
-                            st.session_state['upload_success_msg'] = f"🎉 Đã nhập thành công {count_inserted} nhân sự vào cơ sở dữ liệu!"
+                            st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự vào cơ sở dữ liệu Neon!")
                             if error_logs:
                                 st.warning(f"Có {len(error_logs)} dòng gặp lỗi và bị bỏ qua.")
-                            st.rerun()
+                            st.balloons()
                         else:
-                            st.error("❌ Không thể chèn dữ liệu nào vào CSDL. Chi tiết lỗi:")
+                            st.error("❌ Không chèn được dữ liệu nào. Vui lòng kiểm tra lại tên cột Họ và Tên hoặc định dạng file.")
                             if error_logs:
                                 for err in error_logs[:5]:
                                     st.write(err)
-                            else:
-                                st.write("Không đọc được các cột Họ tên hoặc Mã cán bộ từ file.")
 
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
