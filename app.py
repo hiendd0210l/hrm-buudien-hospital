@@ -1,6 +1,7 @@
 import os
 import io
 import base64
+import unicodedata
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -90,8 +91,15 @@ if 'db_initialized' not in st.session_state:
     st.session_state['db_initialized'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON & TỐI ƯU LUỒNG TRUY VẤN
+# 2. HÀM BỔ TRỢ CHUẨN HÓA TIẾNG VIỆT & DATABASE NEON
 # ---------------------------------------------------------
+def remove_vietnamese_accent(text_str):
+    if not isinstance(text_str, str):
+        return ""
+    text_str = unicodedata.normalize('NFD', text_str)
+    text_str = ''.join(c for c in text_str if unicodedata.category(c) != 'MN')
+    return text_str.replace('đ', 'd').replace('Đ', 'D').lower().replace(" ", "").replace("_", "").replace("-", "")
+
 @st.cache_resource
 def get_db_engine():
     try:
@@ -130,31 +138,6 @@ def init_db_structure():
                     email VARCHAR(100)
                 );
             """))
-            conn.commit()
-
-            # Gỡ bỏ Not Null và Unique nếu có lỗi xung đột
-            res_notnull = conn.execute(text("""
-                SELECT column_name FROM information_schema.columns 
-                WHERE table_name = 'can_bo' AND is_nullable = 'NO' AND column_name != 'id';
-            """)).fetchall()
-
-            for row in res_notnull:
-                try:
-                    conn.execute(text(f'ALTER TABLE can_bo ALTER COLUMN "{row[0]}" DROP NOT NULL;'))
-                except Exception:
-                    pass
-
-            res_unique = conn.execute(text("""
-                SELECT constraint_name FROM information_schema.table_constraints 
-                WHERE table_name = 'can_bo' AND constraint_type = 'UNIQUE';
-            """)).fetchall()
-
-            for row in res_unique:
-                try:
-                    conn.execute(text(f'ALTER TABLE can_bo DROP CONSTRAINT IF EXISTS "{row[0]}";'))
-                except Exception:
-                    pass
-
             conn.commit()
             st.session_state['db_initialized'] = True
     except Exception as e:
@@ -283,7 +266,7 @@ def render_dashboard_home():
         st.plotly_chart(fig_donut, use_container_width=True)
 
 # ---------------------------------------------------------
-# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV
+# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (ĐÃ SỬA LỖI MAPPING EXCEL)
 # ---------------------------------------------------------
 def render_quan_ly_can_bo():
     st.markdown("---")
@@ -293,7 +276,6 @@ def render_quan_ly_can_bo():
         st.error("Chưa kết nối được Cơ sở dữ liệu Neon. Vui lòng kiểm tra lại cấu hình Secrets.")
         return
 
-    # Hiển thị thông báo nếu vừa Upload thành công
     if 'upload_success_msg' in st.session_state:
         st.success(st.session_state['upload_success_msg'])
         del st.session_state['upload_success_msg']
@@ -426,15 +408,16 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ CẢI TIẾN NHẬN DIỆN MỌI ĐỊNH DẠNG TÊN CỘT)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
         with col_m1:
-            st.markdown("##### 📥 **1. Tải về file Excel mẫu**")
-            st.caption("Hãy dùng file mẫu này để hệ thống nhận diện chính xác 100%.")
+            st.markdown("##### 📥 **1. Tải về file Excel mẫu chuẩn**")
+            st.caption("Mẫu file Excel bao gồm đầy đủ tất cả các trường thông tin quản lý nhân sự.")
             
             sample_df = pd.DataFrame({
+                'ID': [1, 2],
                 'Mã Cán bộ': ['CB001', 'CB002'],
                 'Họ và Tên': ['Nguyễn Văn A', 'Trần Thị B'],
                 'Ngày sinh': ['1990-01-15', '1992-05-20'],
@@ -451,9 +434,9 @@ def render_quan_ly_can_bo():
                 sample_df.to_excel(writer, index=False, sheet_name='Mau_Nhan_Su')
             
             st.download_button(
-                label="📄 Tải Mẫu Excel (.xlsx)",
+                label="📄 Tải Mẫu Excel Đầy Đủ Cột (.xlsx)",
                 data=output_sample.getvalue(),
-                file_name="Mau_Danh_Sach_Nhan_Su.xlsx",
+                file_name="Mau_Danh_Sach_Nhan_Su_Chuan.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
@@ -471,22 +454,23 @@ def render_quan_ly_can_bo():
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
                         cols = df_up.columns.tolist()
                         
-                        def get_col(possible_names):
+                        # Thuật toán tìm cột thông minh hỗ trợ cả tiếng Việt không dấu & có dấu
+                        def get_col(keywords):
                             for col in cols:
-                                c_clean = str(col).lower().replace(" ", "").replace("_", "").replace("/", "")
-                                for p in possible_names:
-                                    if p in c_clean:
+                                norm_col = remove_vietnamese_accent(str(col))
+                                for kw in keywords:
+                                    if kw in norm_col:
                                         return col
                             return None
 
-                        c_macb = get_col(['macanbo', 'mcb', 'manhanvien', 'manv', 'stt', 'id'])
+                        c_macb = get_col(['macanbo', 'mcb', 'manhanvien', 'manv', 'stt'])
                         c_hoten = get_col(['hovaten', 'hoten', 'tencanbo', 'tennhanvien', 'fullname', 'ten'])
                         c_ngaysinh = get_col(['ngaysinh', 'ns', 'dob', 'dateofbirth'])
                         c_cccd = get_col(['socccd', 'cccd', 'cmnd', 'socmnd', 'citizencard'])
-                        c_chucdanh = get_col(['chucdanh', 'chucvu', 'vitri'])
-                        c_khoaphong = get_col(['khoaphong', 'khoa', 'phong', 'phongban', 'donvi'])
-                        c_trinhdo = get_col(['trinhdo', 'bangcap', 'hocluc'])
-                        c_sdt = get_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone'])
+                        c_chucdanh = get_col(['chucdanh', 'chucvu', 'vitri', 'position'])
+                        c_khoaphong = get_col(['khoaphong', 'khoa', 'phong', 'phongban', 'donvi', 'department'])
+                        c_trinhdo = get_col(['trinhdo', 'bangcap', 'hocluc', 'degree'])
+                        c_sdt = get_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone', 'mobile'])
                         c_email = get_col(['email', 'mail'])
 
                         if not c_hoten and len(cols) >= 2:
@@ -523,8 +507,9 @@ def render_quan_ly_can_bo():
                                 t = str(row[c_trinhdo]).strip() if c_trinhdo and pd.notna(row[c_trinhdo]) else None
                                 if t and t.lower() == 'nan': t = None
 
-                                s = str(row[c_sdt]).strip() if c_sdt and pd.notna(row[c_sdt]) else None
-                                if s and s.lower() == 'nan': s = None
+                                str_sdt = str(row[c_sdt]).strip() if c_sdt and pd.notna(row[c_sdt]) else None
+                                if str_sdt and str_sdt.endswith('.0'): str_sdt = str_sdt[:-2]
+                                if str_sdt and str_sdt.lower() == 'nan': str_sdt = None
 
                                 e = str(row[c_email]).strip() if c_email and pd.notna(row[c_email]) else None
                                 if e and e.lower() == 'nan': e = None
@@ -537,12 +522,12 @@ def render_quan_ly_can_bo():
                                                 ho_ten = :h, ngay_sinh = :ns, so_cccd = :cccd, chuc_danh = :c, 
                                                 khoa_phong = :k, trinh_do = :t, so_dien_thoai = :s, email = :e
                                             WHERE ma_can_bo = :m
-                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c, "k": k, "t": t, "s": str_sdt, "e": e})
                                     else:
                                         conn.execute(text("""
                                             INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                             VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
-                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c, "k": k, "t": t, "s": str_sdt, "e": e})
                                     count_inserted += 1
                             
                             conn.commit()
@@ -556,21 +541,21 @@ def render_quan_ly_can_bo():
                 except Exception as e_up:
                     st.error(f"Lỗi nhập dữ liệu: {e_up}")
 
-    # TAB 4: XUẤT EXCEL
+    # TAB 4: XUẤT EXCEL (ĐẦY ĐỦ CÁC CỘT DỮ LIỆU KHÔNG THIẾU CỘT NÀO)
     with tab4:
         st.markdown("##### 📊 **Tải toàn bộ dữ liệu Cán bộ CNV ra file Excel**")
         if df.empty:
             st.info("Chưa có dữ liệu để xuất file.")
         else:
-            export_df = df[['ma_can_bo', 'ho_ten', 'ngay_sinh', 'so_cccd', 'chuc_danh', 'khoa_phong', 'trinh_do', 'so_dien_thoai', 'email']].copy()
-            export_df.columns = ['Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Số CCCD', 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email']
+            export_df = df[['id', 'ma_can_bo', 'ho_ten', 'ngay_sinh', 'so_cccd', 'chuc_danh', 'khoa_phong', 'trinh_do', 'so_dien_thoai', 'email']].copy()
+            export_df.columns = ['ID', 'Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Số CCCD', 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email']
             
             output_exp = io.BytesIO()
             with pd.ExcelWriter(output_exp, engine='openpyxl') as writer:
                 export_df.to_excel(writer, index=False, sheet_name='Nhan_Su_BV_Buu_Dien')
             
             st.download_button(
-                label="📥 Tải Danh sách Nhân sự (.xlsx)",
+                label="📥 Tải Danh sách Nhân sự Đầy Đủ Cột (.xlsx)",
                 data=output_exp.getvalue(),
                 file_name="Danh_Sach_Nhan_Su_BV_Buu_Dien.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
