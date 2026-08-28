@@ -300,13 +300,13 @@ def render_quan_ly_can_bo():
             st.toast("🔄 Đã làm mới dữ liệu!")
             st.rerun()
 
-        if col_t3.button("🧹 Xóa hết dữ liệu lỗi", use_container_width=True):
+        if col_t3.button("🧹 Xóa hết dữ liệu", use_container_width=True):
             try:
                 with engine.connect() as conn:
                     conn.execute(text("DELETE FROM can_bo;"))
                     conn.commit()
                 st.cache_data.clear()
-                st.success("Đã làm sạch toàn bộ CSDL! Hãy sang Tab 'Nhập Excel' để Upload lại file mẫu mới.")
+                st.success("Đã làm sạch toàn bộ CSDL!")
                 st.rerun()
             except Exception as e_clean:
                 st.error(f"Lỗi khi làm sạch CSDL: {e_clean}")
@@ -433,7 +433,7 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ CẢI TIẾN TOÀN DIỆN MAPPING ĐỌC EXCEL)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ TỐI ƯU LOGIC BẮT LỖI)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -468,12 +468,12 @@ def render_quan_ly_can_bo():
 
         with col_m2:
             st.markdown("##### 📤 **2. Tải lên file Excel để nhập dữ liệu**")
-            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx) để upload:", type=['xlsx', 'xls'])
+            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx) để upload:", type=['xlsx', 'xls'], key="excel_uploader")
             
             if uploaded_file is not None:
                 try:
-                    df_up = pd.read_excel(uploaded_file, dtype=str)
-                    st.markdown("**Xem trước dữ liệu đọc từ Excel:**")
+                    df_up = pd.read_excel(uploaded_file)
+                    st.markdown(f"**Xem trước dữ liệu (Tổng số dòng: {len(df_up)}):**")
                     st.dataframe(df_up.head(5), use_container_width=True)
                     
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
@@ -512,45 +512,63 @@ def render_quan_ly_can_bo():
                             return s
 
                         count_inserted = 0
+                        error_logs = []
+                        
                         with engine.connect() as conn:
                             for idx, row in df_up.iterrows():
-                                h = clean_str(row[c_hoten]) if c_hoten else None
-                                m = clean_str(row[c_macb]) if c_macb else f"CB{idx+1:04d}"
-                                
-                                raw_ns = clean_str(row[c_ngaysinh]) if c_ngaysinh else None
-                                ns_val = None
-                                if raw_ns:
-                                    try:
-                                        ns_val = pd.to_datetime(raw_ns, dayfirst=True).date()
-                                    except Exception:
-                                        ns_val = None
+                                try:
+                                    h = clean_str(row[c_hoten]) if c_hoten and c_hoten in row else None
+                                    if not h:
+                                        continue
+                                        
+                                    m = clean_str(row[c_macb]) if c_macb and c_macb in row else f"CB{idx+1:04d}"
+                                    if not m:
+                                        m = f"CB{idx+1:04d}"
+                                        
+                                    raw_ns = row[c_ngaysinh] if c_ngaysinh and c_ngaysinh in row else None
+                                    ns_val = None
+                                    if pd.notna(raw_ns):
+                                        try:
+                                            if isinstance(raw_ns, datetime):
+                                                ns_val = raw_ns.date()
+                                            else:
+                                                ns_val = pd.to_datetime(raw_ns, dayfirst=True).date()
+                                        except Exception:
+                                            ns_val = None
 
-                                cccd_val = clean_str(row[c_cccd]) if c_cccd else None
-                                c_val = clean_str(row[c_chucdanh]) if c_chucdanh else None
-                                k_val = clean_str(row[c_khoaphong]) if c_khoaphong else None
-                                t_val = clean_str(row[c_trinhdo]) if c_trinhdo else None
-                                s_val = clean_str(row[c_sdt]) if c_sdt else None
-                                e_val = clean_str(row[c_email]) if c_email else None
+                                    cccd_val = clean_str(row[c_cccd]) if c_cccd and c_cccd in row else None
+                                    c_val = clean_str(row[c_chucdanh]) if c_chucdanh and c_chucdanh in row else None
+                                    k_val = clean_str(row[c_khoaphong]) if c_khoaphong and c_khoaphong in row else None
+                                    t_val = clean_str(row[c_trinhdo]) if c_trinhdo and c_trinhdo in row else None
+                                    s_val = clean_str(row[c_sdt]) if c_sdt and c_sdt in row else None
+                                    e_val = clean_str(row[c_email]) if c_email and c_email in row else None
 
-                                if h:
-                                    # Tiến hành chèn dữ liệu mới hoàn toàn
                                     conn.execute(text("""
                                         INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                         VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
                                     """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c_val, "k": k_val, "t": t_val, "s": s_val, "e": e_val})
                                     count_inserted += 1
+                                except Exception as row_ex:
+                                    error_logs.append(f"Dòng {idx+1}: {str(row_ex)}")
                             
                             conn.commit()
                         
                         if count_inserted > 0:
                             st.cache_data.clear()
-                            st.session_state['upload_success_msg'] = f"🎉 Đã nhập thành công {count_inserted} nhân sự vào hệ thống!"
+                            st.session_state['upload_success_msg'] = f"🎉 Đã nhập thành công {count_inserted} nhân sự vào cơ sở dữ liệu!"
+                            if error_logs:
+                                st.warning(f"Có {len(error_logs)} dòng gặp lỗi và bị bỏ qua.")
                             st.rerun()
                         else:
-                            st.error("❌ Không tìm thấy dữ liệu Họ và Tên hợp lệ trong file Excel. Vui lòng kiểm tra lại!")
+                            st.error("❌ Không thể chèn dữ liệu nào vào CSDL. Chi tiết lỗi:")
+                            if error_logs:
+                                for err in error_logs[:5]:
+                                    st.write(err)
+                            else:
+                                st.write("Không đọc được các cột Họ tên hoặc Mã cán bộ từ file.")
 
                 except Exception as e_up:
-                    st.error(f"Lỗi nhập dữ liệu: {e_up}")
+                    st.error(f"Lỗi đọc file Excel: {e_up}")
 
     # TAB 4: XUẤT EXCEL
     with tab4:
