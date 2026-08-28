@@ -86,26 +86,36 @@ st.markdown("""
 
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
+if 'db_initialized' not in st.session_state:
+    st.session_state['db_initialized'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON & SỬA LỖI CONSTRAINT AUTOMATICALLY
+# 2. KẾT NỐI DATABASE NEON & TỐI ƯU LUỒNG TRUY VẤN
 # ---------------------------------------------------------
+@st.cache_resource
 def get_db_engine():
     try:
         if "DATABASE_URL" in st.secrets:
             raw_url = st.secrets["DATABASE_URL"].strip()
             if raw_url.startswith("postgres://"):
                 raw_url = raw_url.replace("postgres://", "postgresql://", 1)
-            eng = create_engine(raw_url, pool_pre_ping=True)
+            return create_engine(raw_url, pool_pre_ping=True, pool_recycle=300)
         elif "postgres" in st.secrets:
             pg = st.secrets["postgres"]
             db_url = f"postgresql://{pg['user']}:{pg['password']}@{pg['host']}:{pg['port']}/{pg['database']}?sslmode=require"
-            eng = create_engine(db_url, pool_pre_ping=True)
-        else:
-            return None
+            return create_engine(db_url, pool_pre_ping=True, pool_recycle=300)
+        return None
+    except Exception as e:
+        st.error(f"Lỗi khởi tạo Engine DB: {e}")
+        return None
 
-        with eng.connect() as conn:
-            # Tạo bảng nếu chưa tồn tại
+engine = get_db_engine()
+
+def init_db_structure():
+    if not engine or st.session_state['db_initialized']:
+        return
+    try:
+        with engine.connect() as conn:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS can_bo (
                     id SERIAL PRIMARY KEY,
@@ -122,60 +132,35 @@ def get_db_engine():
             """))
             conn.commit()
 
-            # Thêm cột cơ bản nếu thiếu
-            columns_to_check = [
-                ("ma_can_bo", "VARCHAR(50)"),
-                ("ho_ten", "VARCHAR(255)"),
-                ("ngay_sinh", "DATE"),
-                ("so_cccd", "VARCHAR(50)"),
-                ("chuc_danh", "VARCHAR(100)"),
-                ("khoa_phong", "VARCHAR(255)"),
-                ("trinh_do", "VARCHAR(100)"),
-                ("so_dien_thoai", "VARCHAR(20)"),
-                ("email", "VARCHAR(100)")
-            ]
-            for col_name, col_type in columns_to_check:
-                conn.execute(text(f"ALTER TABLE can_bo ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
-
-            # 1. BỎ 'NOT NULL' CHO TẤT CẢ CÁC CỘT (TRỪ ID)
+            # Gỡ bỏ Not Null và Unique nếu có lỗi xung đột
             res_notnull = conn.execute(text("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'can_bo' 
-                  AND is_nullable = 'NO' 
-                  AND column_name != 'id';
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'can_bo' AND is_nullable = 'NO' AND column_name != 'id';
             """)).fetchall()
 
             for row in res_notnull:
-                col_to_drop = row[0]
                 try:
-                    conn.execute(text(f'ALTER TABLE can_bo ALTER COLUMN "{col_to_drop}" DROP NOT NULL;'))
+                    conn.execute(text(f'ALTER TABLE can_bo ALTER COLUMN "{row[0]}" DROP NOT NULL;'))
                 except Exception:
                     pass
 
-            # 2. XÓA BỎ MỌI RÀNG BUỘC 'UNIQUE' TRÊN BẢNG CAN_BO (TRỪ KHÓA CHÍNH PRIMARY KEY)
             res_unique = conn.execute(text("""
-                SELECT constraint_name 
-                FROM information_schema.table_constraints 
-                WHERE table_name = 'can_bo' 
-                  AND constraint_type = 'UNIQUE';
+                SELECT constraint_name FROM information_schema.table_constraints 
+                WHERE table_name = 'can_bo' AND constraint_type = 'UNIQUE';
             """)).fetchall()
 
             for row in res_unique:
-                c_name = row[0]
                 try:
-                    conn.execute(text(f'ALTER TABLE can_bo DROP CONSTRAINT IF EXISTS "{c_name}";'))
+                    conn.execute(text(f'ALTER TABLE can_bo DROP CONSTRAINT IF EXISTS "{row[0]}";'))
                 except Exception:
                     pass
 
             conn.commit()
-
-        return eng
+            st.session_state['db_initialized'] = True
     except Exception as e:
-        st.error(f"Lỗi kết nối CSDL: {e}")
-        return None
+        print(f"Khởi tạo DB warning: {e}")
 
-engine = get_db_engine()
+init_db_structure()
 
 def load_data_from_db():
     if not engine:
@@ -308,6 +293,11 @@ def render_quan_ly_can_bo():
         st.error("Chưa kết nối được Cơ sở dữ liệu Neon. Vui lòng kiểm tra lại cấu hình Secrets.")
         return
 
+    # Hiển thị thông báo nếu vừa Upload thành công
+    if 'upload_success_msg' in st.session_state:
+        st.success(st.session_state['upload_success_msg'])
+        del st.session_state['upload_success_msg']
+
     df = load_data_from_db()
 
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -322,7 +312,6 @@ def render_quan_ly_can_bo():
         col_t1, col_t2 = st.columns([4, 1])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
         if col_t2.button("🔄 Tải lại dữ liệu"):
-            st.cache_data.clear()
             st.rerun()
 
         if df.empty:
@@ -342,7 +331,6 @@ def render_quan_ly_can_bo():
                 with engine.connect() as conn:
                     conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
                     conn.commit()
-                st.cache_data.clear()
                 st.success(f"Đã xóa thành công nhân sự [{selected_del}]!")
                 st.rerun()
 
@@ -380,7 +368,6 @@ def render_quan_ly_can_bo():
                                     VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
                                 """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save})
                                 conn.commit()
-                            st.cache_data.clear()
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
                             st.rerun()
                         except Exception as ex:
@@ -434,7 +421,6 @@ def render_quan_ly_can_bo():
                                     WHERE id = :id
                                 """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save, "id": edit_id})
                                 conn.commit()
-                            st.cache_data.clear()
                             st.success("Đã cập nhật thông tin thành công!")
                             st.rerun()
                         except Exception as ex:
@@ -525,10 +511,8 @@ def render_quan_ly_can_bo():
                                     except Exception:
                                         ns_val = None
 
-                                # NẾU TRỐNG THÌ CHUYỂN THÀNH NONE (NULL), TRÁNH TRÙNG CHUỖI RỖNG
                                 cccd_val = str(row[c_cccd]).strip() if c_cccd and pd.notna(row[c_cccd]) else None
-                                if cccd_val and cccd_val.lower() == 'nan':
-                                    cccd_val = None
+                                if cccd_val and cccd_val.lower() == 'nan': cccd_val = None
 
                                 c = str(row[c_chucdanh]).strip() if c_chucdanh and pd.notna(row[c_chucdanh]) else None
                                 if c and c.lower() == 'nan': c = None
@@ -563,10 +547,8 @@ def render_quan_ly_can_bo():
                             
                             conn.commit()
                         
-                        st.cache_data.clear()
-                        
                         if count_inserted > 0:
-                            st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự vào hệ thống!")
+                            st.session_state['upload_success_msg'] = f"🎉 Đã nhập thành công {count_inserted} nhân sự vào hệ thống!"
                             st.rerun()
                         else:
                             st.error("❌ Không tìm thấy thông tin Họ và Tên hợp lệ. Vui lòng thử lại!")
