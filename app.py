@@ -304,9 +304,8 @@ def render_quan_ly_can_bo():
             
         if col_t3.button("🧹 Xóa hết dữ liệu", use_container_width=True):
             try:
-                with engine.connect() as conn:
+                with engine.begin() as conn:
                     conn.execute(text("DELETE FROM can_bo;"))
-                    conn.commit()
                 st.cache_data.clear()
                 st.success("Đã làm sạch toàn bộ CSDL!")
                 st.rerun()
@@ -342,9 +341,8 @@ def render_quan_ly_can_bo():
                 if target_id is None:
                     st.warning("⚠️ Bạn chưa chọn nhân sự nào!")
                 else:
-                    with engine.connect() as conn:
+                    with engine.begin() as conn:
                         conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
-                        conn.commit()
                     st.cache_data.clear()
                     st.success(f"Đã xóa thành công [{selected_del_label}]!")
                     st.rerun()
@@ -381,12 +379,12 @@ def render_quan_ly_can_bo():
                             sdt_save = sdt.strip() if sdt and sdt.strip() else None
                             email_save = email.strip() if email and email.strip() else None
                             
-                            with engine.connect() as conn:
+                            with engine.begin() as conn:
                                 conn.execute(text("""
                                     INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                     VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
                                 """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save})
-                                conn.commit()
+                                
                             st.cache_data.clear()
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
                             st.rerun()
@@ -425,21 +423,21 @@ def render_quan_ly_can_bo():
                             cccd_save = so_cccd.strip() if so_cccd and so_cccd.strip() else None
                             sdt_save = sdt.strip() if sdt and sdt.strip() else None
                             email_save = email.strip() if email and email.strip() else None
-                            with engine.connect() as conn:
+                            with engine.begin() as conn:
                                 conn.execute(text("""
                                     UPDATE can_bo 
                                     SET ma_can_bo = :m, ho_ten = :h, ngay_sinh = :ns, so_cccd = :cccd, chuc_danh = :c, 
                                         khoa_phong = :k, trinh_do = :t, so_dien_thoai = :s, email = :e
                                     WHERE id = :id
                                 """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save, "id": edit_id})
-                                conn.commit()
+                                
                             st.cache_data.clear()
                             st.success("Đã cập nhật thông tin thành công!")
                             st.rerun()
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (CẢI TIẾN BÁO CÁO KẾT QUẢ CHI TIẾT)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ TỐI ƯU ÁNH XẠ & THÔNG BÁO RÕ RÀNG)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -513,32 +511,44 @@ def render_quan_ly_can_bo():
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True, type="primary"):
                         count_inserted = 0
                         count_errors = 0
-                        error_details = []
-                        col_list = list(df_up.columns)
+                        error_logs = []
                         
-                        def get_val(row_item, key):
-                            if key in col_list:
-                                val = row_item[key]
-                                if pd.notna(val):
-                                    s = str(val).strip()
-                                    if s.lower() not in ['nan', 'none', '', 'null']:
-                                        if s.endswith('.0'):
-                                            s = s[:-2]
-                                        return s
+                        # Chuẩn hóa tên cột file Excel (loại bỏ khoảng trắng, chữ hoa/thường)
+                        col_mapping = {c.strip().lower(): c for c in df_up.columns}
+                        
+                        def find_val(row_item, possible_keys):
+                            for pk in possible_keys:
+                                pk_norm = pk.strip().lower()
+                                if pk_norm in col_mapping:
+                                    real_col = col_mapping[pk_norm]
+                                    val = row_item[real_col]
+                                    if pd.notna(val):
+                                        s = str(val).strip()
+                                        if s.lower() not in ['nan', 'none', '', 'null']:
+                                            if s.endswith('.0'):
+                                                s = s[:-2]
+                                            return s
                             return None
-                            
-                        with engine.connect() as conn:
+
+                        with engine.begin() as conn:
                             for idx, row in df_up.iterrows():
                                 try:
-                                    h_val = get_val(row, 'Ho_Ten')
+                                    h_val = find_val(row, ['Ho_Ten', 'Họ và Tên', 'Ho Ten'])
                                     if not h_val:
                                         count_errors += 1
+                                        error_logs.append(f"Dòng {idx+1}: Thiếu Họ tên.")
                                         continue
                                         
-                                    m_val = get_val(row, 'Ma_NV') or f"N{idx+1:04d}"
+                                    m_val = find_val(row, ['Ma_NV', 'Mã NV', 'Ma_Can_Bo', 'Mã Cán Bộ']) or f"N{idx+1:04d}"
                                     
-                                    raw_ns = row.get('Ngay_Sinh')
+                                    # Xử lý ngày sinh linh hoạt
                                     ns_val = None
+                                    raw_ns = None
+                                    for date_key in ['Ngay_Sinh', 'Ngày Sinh', 'NgaySinh']:
+                                        if date_key.strip().lower() in col_mapping:
+                                            raw_ns = row[col_mapping[date_key.strip().lower()]]
+                                            break
+                                            
                                     if pd.notna(raw_ns):
                                         try:
                                             if isinstance(raw_ns, datetime):
@@ -548,12 +558,12 @@ def render_quan_ly_can_bo():
                                         except Exception:
                                             ns_val = None
                                             
-                                    cccd_val = get_val(row, 'So_CCCD')
-                                    chuc_vu_val = get_val(row, 'Chuc_Vu')
-                                    khoa_phong_val = get_val(row, 'Khoa_Phong')
-                                    trinh_do_val = get_val(row, 'Trình_Do_Chuyen_Mon')
-                                    sdt_val = get_val(row, 'Dien_Thoai')
-                                    email_val = get_val(row, 'Email') if 'Email' in col_list else None
+                                    cccd_val = find_val(row, ['So_CCCD', 'Số CCCD', 'CCCD'])
+                                    chuc_vu_val = find_val(row, ['Chuc_Vu', 'Chức Vụ', 'Chuc_Danh', 'Chức danh'])
+                                    khoa_phong_val = find_val(row, ['Khoa_Phong', 'Khoa / Phòng', 'KhoaPhong'])
+                                    trinh_do_val = find_val(row, ['Trinh_Do_Chuyen_Mon', 'Trình Độ Chuyên Môn', 'Trinh_Do', 'Trình độ'])
+                                    sdt_val = find_val(row, ['Dien_Thoai', 'Điện Thoại', 'So_Dien_Thoai', 'Số điện thoại'])
+                                    email_val = find_val(row, ['Email'])
                                     
                                     conn.execute(text("""
                                         INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
@@ -572,24 +582,22 @@ def render_quan_ly_can_bo():
                                     count_inserted += 1
                                 except Exception as row_ex:
                                     count_errors += 1
-                                    error_details.append(f"Dòng {idx+1}: {str(row_ex)}")
-                            
-                            conn.commit()
+                                    error_logs.append(f"Dòng {idx+1}: {str(row_ex)}")
                         
-                        # Hiển thị thông báo kết quả chi tiết
+                        # Hiển thị thông báo kết quả rõ ràng sau khi upload xong
+                        st.cache_data.clear()
                         if count_inserted > 0:
-                            st.cache_data.clear()
-                            st.success(f"🎉 **Đã nhập thành công {count_inserted} nhân sự** vào CSDL!")
+                            st.success(f"🎉 **Đã upload thành công {count_inserted} nhân sự** vào Cơ sở dữ liệu!")
                             if count_errors > 0:
-                                st.warning(f"⚠️ Có {count_errors} dòng bị bỏ qua hoặc lỗi (thiếu Họ tên hoặc sai định dạng).")
+                                st.warning(f"⚠️ Có {count_errors} dòng bị bỏ qua do thiếu thông tin hoặc lỗi định dạng.")
                             st.balloons()
                             st.rerun()
                         else:
-                            st.error(f"❌ Không chèn được dữ liệu nào. Có {count_errors} lỗi xảy ra. Vui lòng kiểm tra lại cấu trúc tiêu đề file Excel.")
-                            if error_details:
-                                with st.expander("Xem chi tiết lỗi"):
-                                    for err in error_details[:10]:
-                                        st.write(err)
+                            st.error(f"❌ Không thể nhập dữ liệu. Có {count_errors} lỗi xảy ra.")
+                            if error_logs:
+                                with st.expander("🔍 Xem chi tiết lỗi"):
+                                    for log in error_logs[:15]:
+                                        st.write(log)
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
 
