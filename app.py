@@ -4,7 +4,7 @@ import plotly.express as px
 from sqlalchemy import create_engine, text
 
 # ---------------------------------------------------------
-# 1. CẤU HÌNH TRANG & CSS TÙY CHỈNH
+# 1. CẤU HÌNH TRANG & CSS GIỐNG HỆT BẢN THIẾT KẾ GỐC
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="BỆNH VIỆN BƯU ĐIỆN - Hệ thống Quản trị Nhân sự & Điều hành",
@@ -13,122 +13,81 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS chuyên nghiệp cho màn hình đăng nhập & Dashboard
 st.markdown("""
 <style>
-    /* Gradient nền chính cho toàn bộ trang đăng nhập */
+    /* Nền trắng chuẩn theo ảnh thiết kế */
     .stApp {
-        background: linear-gradient(135deg, #eef2f7 0%, #e3edf7 100%);
+        background-color: #fcfcfc !important;
     }
 
-    /* Khung Card Login trung tâm */
-    .login-container {
-        max-width: 450px;
-        margin: 30px auto 0 auto;
-        background: #ffffff;
-        padding: 35px 30px 30px 30px;
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0, 82, 204, 0.12);
-        border: 1px solid #e1e8f0;
-        text-align: center;
-    }
-
-    /* Khung hiển thị Logo nổi bật */
-    .logo-wrapper {
-        background: #ffffff;
-        width: 110px;
-        height: 110px;
-        margin: -85px auto 15px auto;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 6px 16px rgba(0, 82, 204, 0.18);
-        border: 4px solid #ffffff;
-    }
-
-    .logo-wrapper img {
-        width: 85px;
-        height: auto;
-    }
-
-    /* Tiêu đề trang đăng nhập */
-    .brand-title {
-        color: #003b95;
+    /* Tiêu đề chính BỆNH VIỆN BƯU ĐIỆN */
+    .hospital-title {
+        color: #0068b5;
         font-weight: 800;
-        font-size: 22px;
+        font-size: 24px;
+        text-align: center;
+        margin-top: 10px;
+        margin-bottom: 2px;
         letter-spacing: 0.5px;
-        margin-bottom: 4px;
-        text-transform: uppercase;
     }
 
-    .brand-subtitle {
-        color: #5a6e85;
+    /* Dòng phụ đề bên dưới tiêu đề */
+    .hospital-subtitle {
+        color: #666666;
         font-size: 13px;
-        font-weight: 500;
+        text-align: center;
         margin-bottom: 25px;
     }
 
-    /* Tùy chỉnh nhãn & ô nhập liệu */
+    /* Khung Card bao quanh ô đăng nhập */
+    .login-card {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 25px 30px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+
+    /* Label ô nhập liệu */
     .stTextInput > label {
-        color: #2c3e50 !important;
-        font-weight: 600 !important;
-        font-size: 13px !important;
-    }
-
-    .stTextInput > div > div > input {
-        border-radius: 8px !important;
-        border: 1px solid #cbd5e1 !important;
-        padding: 10px 14px !important;
-        font-size: 14px !important;
-    }
-
-    .stTextInput > div > div > input:focus {
-        border-color: #0052cc !important;
-        box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.15) !important;
-    }
-
-    /* Style nút Đăng nhập & Thoát */
-    div.stButton > button[key="btn_login"] {
-        background: linear-gradient(135deg, #0052cc 0%, #0066ff 100%) !important;
-        color: #ffffff !important;
-        font-weight: 700 !important;
-        font-size: 14px !important;
-        border-radius: 8px !important;
-        border: none !important;
-        padding: 10px 0 !important;
-        box-shadow: 0 4px 12px rgba(0, 82, 204, 0.25) !important;
-        transition: all 0.2s ease !important;
-    }
-
-    div.stButton > button[key="btn_login"]:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 16px rgba(0, 82, 204, 0.35) !important;
-    }
-
-    div.stButton > button[key="btn_exit"] {
-        background: #f1f5f9 !important;
         color: #475569 !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+    }
+
+    /* Input text box */
+    .stTextInput > div > div > input {
+        border-radius: 6px !important;
+        border: 1px solid #cbd5e1 !important;
+        background-color: #ffffff !important;
+        height: 40px !important;
+    }
+
+    /* Style cho cả 2 nút Đăng nhập và Thoát màu xanh lam chuẩn thiết kế */
+    div.stButton > button[key="btn_login"], 
+    div.stButton > button[key="btn_exit"] {
+        background-color: #0077ba !important;
+        color: #ffffff !important;
         font-weight: 600 !important;
         font-size: 14px !important;
-        border-radius: 8px !important;
-        border: 1px solid #cbd5e1 !important;
-        padding: 10px 0 !important;
-        transition: all 0.2s ease !important;
+        border-radius: 6px !important;
+        border: none !important;
+        height: 42px !important;
+        transition: background-color 0.2s ease !important;
     }
 
+    div.stButton > button[key="btn_login"]:hover, 
     div.stButton > button[key="btn_exit"]:hover {
-        background: #e2e8f0 !important;
-        color: #1e293b !important;
+        background-color: #005c91 !important;
     }
 
-    /* Custom CSS Dashboard Card */
+    /* CSS Giao diện Dashboard */
     .card-box {
         padding: 20px;
-        border-radius: 12px;
+        border-radius: 10px;
         color: white;
         margin-bottom: 15px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         min-height: 130px;
     }
     .card-red { background: linear-gradient(135deg, #e53935, #d32f2f); }
@@ -138,7 +97,7 @@ st.markdown("""
     .card-orange { background: linear-gradient(135deg, #ff9200, #e67e00); }
     .card-teal { background: linear-gradient(135deg, #00a896, #028090); }
 
-    .card-title { font-size: 15px; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
+    .card-title { font-size: 15px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
     .card-desc { font-size: 12px; opacity: 0.9; margin-bottom: 10px; }
     .card-link { font-size: 11px; font-weight: bold; text-align: right; text-transform: uppercase; }
 
@@ -160,22 +119,21 @@ st.markdown("""
     .badge-green { border-color: #00b074; color: #00b074; }
 
     .alert-item {
-        background-color: #ffffff;
+        background-color: #f8f9fa;
         padding: 12px 15px;
         border-radius: 8px;
         margin-bottom: 10px;
         border-left: 4px solid #00b074;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Khởi tạo session lưu trạng thái đăng nhập
+# Khởi tạo session lưu đăng nhập
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON POSTGRESQL
+# 2. KẾT NỐI DATABASE NEON
 # ---------------------------------------------------------
 @st.cache_resource
 def get_db_engine():
@@ -197,49 +155,51 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. MÀN HÌNH ĐĂNG NHẬP SANG TRỌNG & NỔI BẬT LOGO
+# 3. TRANG ĐĂNG NHẬP CHUẨN MẪU THIẾT KẾ GỐC
 # ---------------------------------------------------------
 def render_login():
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    col_l, col_main, col_r = st.columns([1, 1.2, 1])
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Căn giữa nội dung
+    col_l, col_center, col_r = st.columns([1, 1.6, 1])
 
-    with col_main:
-        # Khung Logo Nổi bật đặt đè lên Card
-        st.markdown("""
-        <div class="logo-wrapper">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/VNPT_Logo.svg/1200px-VNPT_Logo.svg.png" alt="VNPT Logo">
-        </div>
-        """, unsafe_allow_html=True)
+    with col_center:
+        # 1. Logo Bệnh viện Bưu điện tròn ở chính giữa
+        c_i1, c_i2, c_i3 = st.columns([1, 0.8, 1])
+        with c_i2:
+            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/VNPT_Logo.svg/1200px-VNPT_Logo.svg.png", width=110)
 
-        # Khung Form Đăng nhập
+        # 2. Tiêu đề & Phụ đề
+        st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
+        st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
+
+        # 3. Khung Form Đăng nhập
         with st.container():
-            st.markdown("<div class='login-container'>", unsafe_allow_html=True)
-            st.markdown("<div class='brand-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
-            st.markdown("<div class='brand-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
-
-            username = st.text_input("Tên đăng nhập / Username", placeholder="Tên tài khoản...")
-            password = st.text_input("Mật khẩu / Password", type="password", placeholder="••••••••")
+            st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+            
+            username = st.text_input("Tên đăng nhập / Username:", placeholder="Nhập tên đăng nhập...")
+            password = st.text_input("Mật khẩu / Password:", type="password", placeholder="Nhập mật khẩu...")
 
             st.markdown("<br>", unsafe_allow_html=True)
-            btn_col1, btn_col2 = st.columns([1.5, 1])
+            b_col1, b_col2 = st.columns(2)
 
-            with btn_col1:
-                if st.button("🔑 ĐĂNG NHẬP", key="btn_login", use_container_width=True):
+            with b_col1:
+                if st.button("🔑 Đăng nhập", key="btn_login", use_container_width=True):
                     if username == "admin" and password == "admin123":
                         st.session_state['logged_in'] = True
                         st.success("Đăng nhập thành công!")
                         st.rerun()
                     else:
-                        st.error("❌ Tên đăng nhập hoặc mật khẩu sai!")
+                        st.error("❌ Tên đăng nhập hoặc mật khẩu chưa đúng!")
 
-            with btn_col2:
+            with b_col2:
                 if st.button("✕ Thoát", key="btn_exit", use_container_width=True):
-                    st.info("Phiên làm việc tạm dừng.")
+                    st.info("Đã đóng phiên đăng nhập.")
 
             st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 4. GIAO DIỆN CHÍNH (SAU KHI ĐĂNG NHẬP)
+# 4. GIAO DIỆN CHÍNH DASHBOARD
 # ---------------------------------------------------------
 def render_dashboard():
     st.sidebar.title("DANH MỤC CHỨC NĂNG")
@@ -273,7 +233,6 @@ def render_dashboard():
         ]
     )
 
-    # Header người dùng
     col_user_img, col_user_info = st.columns([1, 11])
     with col_user_img:
         st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=70)
@@ -363,7 +322,7 @@ def render_dashboard():
         st.info(f"⚙️ Chức năng **{menu}** đang được đồng bộ dữ liệu.")
 
 # ---------------------------------------------------------
-# 5. ĐIỀU HƯỚNG MÀN HÌNH
+# 5. BẮT ĐẦU ĐIỀU HƯỚNG
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     render_login()
