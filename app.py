@@ -188,7 +188,7 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (SỬA LỖI INDENTATION & CĂN GIỮA LOGO TO)
+# 3. TRANG ĐĂNG NHẬP (LẤY LOGO.PNG CHUẨN VÀ NÚT 3D)
 # ---------------------------------------------------------
 def render_login():
     st.markdown("<br>", unsafe_allow_html=True)
@@ -196,15 +196,25 @@ def render_login():
     col_l, col_center, col_r = st.columns([1.5, 2.0, 1.5])
 
     with col_center:
-        # Căn giữa và chỉnh kích thước logo chuẩn 220px
-        st.markdown(
-            """
-            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 15px;">
-            """, 
-            unsafe_allow_html=True
-        )
-        st.image("benhvienbuudien logo.png", width=220)
-        st.markdown("</div>", unsafe_allow_html=True)
+        # Đọc file logo.png từ GitHub repository
+        logo_path = os.path.join(os.path.dirname(__file__), "logo.png") if '__file__' in globals() else "logo.png"
+
+        if os.path.exists(logo_path):
+            with open(logo_path, "rb") as f:
+                encoded_img = base64.b64encode(f.read()).decode("utf-8")
+            st.markdown(
+                f"""
+                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 15px;">
+                    <img src="data:image/png;base64,{encoded_img}" width="200" style="object-fit: contain;">
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            # Dự phòng hiển thị bằng st.image nếu không cần mã hóa
+            st.markdown('<div style="display: flex; justify-content: center; align-items: center; margin-bottom: 15px;">', unsafe_allow_html=True)
+            st.image("logo.png", width=200)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
         st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
