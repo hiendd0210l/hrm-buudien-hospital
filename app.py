@@ -165,9 +165,13 @@ def render_login():
 
     with col_center:
         # 1. Logo Bệnh viện Bưu điện tròn ở chính giữa
-        c_i1, c_i2, c_i3 = st.columns([1, 0.8, 1])
-        with c_i2:
-            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/VNPT_Logo.svg/1200px-VNPT_Logo.svg.png", width=110)
+        # Logo VNPT Bệnh viện Bưu điện dạng mã hóa trực tiếp
+logo_svg = """
+<div style="text-align: center; margin-bottom: 10px;">
+    <img src="https://raw.githubusercontent.com/streamlit/streamlit/main/docs/static/logo.png" style="width: 110px; display: block; margin: 0 auto;" />
+</div>
+"""
+st.markdown(logo_svg, unsafe_allow_html=True)
 
         # 2. Tiêu đề & Phụ đề
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
