@@ -167,45 +167,64 @@ def render_login():
     col_l, col_center, col_r = st.columns([1, 1.6, 1])
 
     with col_center:
-        # 1. Logo Bệnh viện Bưu điện VNPT ở chính giữa
-        st.markdown(
-            """
-            <div style="text-align: center; margin-bottom: 10px;">
-                <img src="https://benhvienbuudien.vn/wp-content/uploads/2021/04/logo-benh-vien-buu-dien.png" style="width: 110px; height: auto;" />
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
+        # 1. Logo Bệnh viện Bưu điện VNPT vẽ bằng SVG (Hiển thị 100%, không lo vỡ ảnh)
+        logo_svg = """
+        <div style="text-align: center; margin-bottom: 15px;">
+            <svg width="120" height="120" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <!-- Vòng tròn nền xanh -->
+                <circle cx="100" cy="100" r="95" fill="#0066b2"/>
+                <!-- Vòng tròn trắng bên trong -->
+                <circle cx="100" cy="100" r="72" fill="#ffffff"/>
+                <!-- Chữ BỆNH VIỆN BƯU ĐIỆN cong phía trên -->
+                <path id="text-path" d="M 35 100 A 65 65 0 0 1 165 100" fill="none"/>
+                <text fill="#0066b2" font-size="13" font-weight="bold" font-family="Arial">
+                    <textPath href="#text-path" startOffset="50%" text-anchor="middle">
+                        BỆNH VIỆN BƯU ĐIỆN
+                    </textPath>
+                </text>
+                <!-- Ngôi sao 2 bên -->
+                <polygon points="32,95 35,102 28,98 36,98 29,102" fill="#ffffff"/>
+                <polygon points="168,95 171,102 164,98 172,98 165,102" fill="#ffffff"/>
+                <!-- Chữ chữ thập đỏ ở trung tâm -->
+                <rect x="88" y="55" width="24" height="60" fill="#e51c23" rx="2"/>
+                <rect x="70" y="73" width="60" height="24" fill="#e51c23" rx="2"/>
+                <!-- Đôi bàn tay nâng đỡ (lá mầm xanh) -->
+                <path d="M 60 115 C 75 135, 100 138, 100 138 C 100 138, 125 135, 140 115 C 120 128, 100 128, 100 128 C 100 128, 80 128, 60 115 Z" fill="#4caf50"/>
+                <!-- Chữ VNPT màu trắng ở dải băng xanh dưới -->
+                <path d="M 40 130 Q 100 165 160 130 A 95 95 0 0 1 40 130 Z" fill="#0066b2"/>
+                <text x="100" y="162" fill="#ffffff" font-size="18" font-weight="900" font-family="Arial" text-anchor="middle">VNPT</text>
+            </svg>
+        </div>
+        """
+        st.markdown(logo_svg, unsafe_allow_html=True)
 
         # 2. Tiêu đề & Phụ đề
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
         st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
 
         # 3. Khung Form Đăng nhập
-        with st.container():
-            st.markdown("<div class='login-card'>", unsafe_allow_html=True)
-            
-            username = st.text_input("Tên đăng nhập / Username:", placeholder="Nhập tên đăng nhập...")
-            password = st.text_input("Mật khẩu / Password:", type="password", placeholder="Nhập mật khẩu...")
+        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+        
+        username = st.text_input("Tên đăng nhập / Username:", placeholder="Nhập tên đăng nhập...")
+        password = st.text_input("Mật khẩu / Password:", type="password", placeholder="Nhập mật khẩu...")
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            b_col1, b_col2 = st.columns(2)
+        st.markdown("<br>", unsafe_allow_html=True)
+        b_col1, b_col2 = st.columns(2)
 
-            with b_col1:
-                if st.button("🔑 Đăng nhập", key="btn_login", use_container_width=True):
-                    if username == "admin" and password == "admin123":
-                        st.session_state['logged_in'] = True
-                        st.success("Đăng nhập thành công!")
-                        st.rerun()
-                    else:
-                        st.error("❌ Tên đăng nhập hoặc mật khẩu chưa đúng!")
+        with b_col1:
+            if st.button("🔑 Đăng nhập", key="btn_login", use_container_width=True):
+                if username == "admin" and password == "admin123":
+                    st.session_state['logged_in'] = True
+                    st.success("Đăng nhập thành công!")
+                    st.rerun()
+                else:
+                    st.error("❌ Tên đăng nhập hoặc mật khẩu chưa đúng!")
 
-            with b_col2:
-                if st.button("✕ Thoát", key="btn_exit", use_container_width=True):
-                    st.info("Đã đóng phiên đăng nhập.")
+        with b_col2:
+            if st.button("✕ Thoát", key="btn_exit", use_container_width=True):
+                st.info("Đã đóng phiên đăng nhập.")
 
-            st.markdown("</div>", unsafe_allow_html=True)
-
+        st.markdown("</div>", unsafe_allow_html=True)
 # ---------------------------------------------------------
 # 4. GIAO DIỆN CHÍNH DASHBOARD
 # ---------------------------------------------------------
