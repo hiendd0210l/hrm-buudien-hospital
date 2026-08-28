@@ -4,7 +4,7 @@ import plotly.express as px
 from sqlalchemy import create_engine, text
 
 # ---------------------------------------------------------
-# 1. CẤU HÌNH TRANG & CSS NỔI BẬT & THU GỌN FORM
+# 1. CẤU HÌNH TRANG & CSS GIAO DIỆN SẮC NÉT & ĐỒ HỌA 3D
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="BỆNH VIỆN BƯU ĐIỆN - Hệ thống Quản trị Nhân sự & Điều hành",
@@ -15,23 +15,20 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Nền trang xám rất nhạt để tôn form đăng nhập */
     .stApp {
         background-color: #f1f5f9 !important;
     }
 
-    /* Tiêu đề chính BỆNH VIỆN BƯU ĐIỆN */
     .hospital-title {
-        color: #005696 !important;
+        color: #0066b2 !important;
         font-weight: 800 !important;
         font-size: 26px !important;
         text-align: center;
-        margin-top: 10px;
+        margin-top: 8px;
         margin-bottom: 2px;
         letter-spacing: 0.5px;
     }
 
-    /* Dòng phụ đề */
     .hospital-subtitle {
         color: #475569 !important;
         font-size: 14px !important;
@@ -40,70 +37,85 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* Khung Form Đăng Nhập: Thu gọn chiều ngang & Tô màu đậm nét */
     .login-card {
         background-color: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 12px !important;
-        padding: 30px 25px !important;
+        padding: 28px 25px !important;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-        max-width: 480px;
+        max-width: 460px;
         margin: 0 auto;
     }
 
-    /* Nhãn Ô Nhập (Label) Đậm Nét */
+    /* Nhãn ô nhập liệu đậm, rõ nét */
     .stTextInput > label {
         color: #0f172a !important;
         font-size: 14px !important;
         font-weight: 700 !important;
-        margin-bottom: 6px !important;
+        margin-bottom: 4px !important;
     }
 
-    /* Khung Ô Nhập Liệu Rõ Ràng */
+    /* Viền ô nhập liệu rõ ràng */
     .stTextInput > div > div > input {
         border-radius: 6px !important;
         border: 1.5px solid #94a3b8 !important;
         background-color: #ffffff !important;
         color: #0f172a !important;
         font-size: 15px !important;
-        height: 44px !important;
+        height: 42px !important;
     }
     .stTextInput > div > div > input:focus {
-        border-color: #0077ba !important;
-        box-shadow: 0 0 0 3px rgba(0, 119, 186, 0.2) !important;
+        border-color: #0066b2 !important;
+        box-shadow: 0 0 0 3px rgba(0, 102, 178, 0.2) !important;
     }
 
-    /* Nút Đăng nhập Màu Xanh Lam Đậm */
+    /* -----------------------------------------------------
+       NÚT ĐĂNG NHẬP 3D (XANH LAM DỐC)
+       ----------------------------------------------------- */
     div.stButton > button[key="btn_login"] {
-        background-color: #0077ba !important;
+        background: linear-gradient(180deg, #0080e5 0%, #0056a3 100%) !important;
         color: #ffffff !important;
         font-weight: 700 !important;
         font-size: 15px !important;
-        border-radius: 6px !important;
-        border: none !important;
+        border-radius: 8px !important;
+        border: 1px solid #004080 !important;
         height: 44px !important;
-        box-shadow: 0 2px 4px rgba(0,119,186,0.3) !important;
+        box-shadow: 0 5px 0px #003366, 0 8px 12px rgba(0,0,0,0.2) !important;
+        transition: all 0.1s ease !important;
+        text-shadow: 0px 1px 2px rgba(0,0,0,0.4);
     }
     div.stButton > button[key="btn_login"]:hover {
-        background-color: #005c91 !important;
+        background: linear-gradient(180deg, #0090ff 0%, #0062b8 100%) !important;
+    }
+    div.stButton > button[key="btn_login"]:active {
+        box-shadow: 0 2px 0px #003366, 0 3px 6px rgba(0,0,0,0.2) !important;
+        transform: translateY(3px) !important;
     }
 
-    /* Nút Thoát Màu Đỏ Nổi Bật */
+    /* -----------------------------------------------------
+       NÚT THOÁT 3D (ĐỎ DỐC)
+       ----------------------------------------------------- */
     div.stButton > button[key="btn_exit"] {
-        background-color: #ef4444 !important;
+        background: linear-gradient(180deg, #f87171 0%, #dc2626 100%) !important;
         color: #ffffff !important;
         font-weight: 700 !important;
         font-size: 15px !important;
-        border-radius: 6px !important;
-        border: none !important;
+        border-radius: 8px !important;
+        border: 1px solid #991b1b !important;
         height: 44px !important;
-        box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3) !important;
+        box-shadow: 0 5px 0px #7f1d1d, 0 8px 12px rgba(0,0,0,0.2) !important;
+        transition: all 0.1s ease !important;
+        text-shadow: 0px 1px 2px rgba(0,0,0,0.4);
     }
     div.stButton > button[key="btn_exit"]:hover {
-        background-color: #dc2626 !important;
+        background: linear-gradient(180deg, #ff8585 0%, #e11d48 100%) !important;
+    }
+    div.stButton > button[key="btn_exit"]:active {
+        box-shadow: 0 2px 0px #7f1d1d, 0 3px 6px rgba(0,0,0,0.2) !important;
+        transform: translateY(3px) !important;
     }
 
-    /* CSS Giao diện Dashboard */
+    /* Dashboard Styles */
     .card-box {
         padding: 20px;
         border-radius: 10px;
@@ -176,34 +188,45 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (THU GỌN & RÕ NÉT)
+# 3. TRANG ĐĂNG NHẬP (LOGO CHUẨN KHỚP FILE VÀ NÚT 3D)
 # ---------------------------------------------------------
 def render_login():
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    # Căn giữa và thu hẹp tỷ lệ cột (1.8 - 1.4 - 1.8)
     col_l, col_center, col_r = st.columns([1.8, 1.4, 1.8])
 
     with col_center:
-        # Logo VNPT Bệnh viện Bưu điện vẽ SVG sắc nét
+        # LOGO KHỚP CHÍNH XÁC FILE BEHNVIENBUUDIEN LOGO.PNG
         st.markdown("""
-<div style="text-align: center; margin-bottom: 15px;">
-    <svg width="110" height="110" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="100" cy="100" r="95" fill="#0066b2"/>
-        <circle cx="100" cy="100" r="72" fill="#ffffff"/>
-        <path id="text-path" d="M 35 100 A 65 65 0 0 1 165 100" fill="none"/>
-        <text fill="#0066b2" font-size="13" font-weight="bold" font-family="Arial">
+<div style="text-align: center; margin-bottom: 10px;">
+    <svg width="130" height="130" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Vòng tròn nền xanh dương -->
+        <circle cx="100" cy="100" r="92" fill="#0066b2"/>
+        <!-- Vòng tròn lõi trắng -->
+        <circle cx="100" cy="100" r="68" fill="#ffffff"/>
+        
+        <!-- Cung đường cong chữ BỆNH VIỆN BƯU ĐIỆN -->
+        <path id="text-path" d="M 36 100 A 64 64 0 0 1 164 100" fill="none"/>
+        <text fill="#ffffff" font-size="13.5" font-weight="900" font-family="Arial, sans-serif">
             <textPath href="#text-path" startOffset="50%" text-anchor="middle">
                 BỆNH VIỆN BƯU ĐIỆN
             </textPath>
         </text>
-        <polygon points="32,95 35,102 28,98 36,98 29,102" fill="#ffffff"/>
-        <polygon points="168,95 171,102 164,98 172,98 165,102" fill="#ffffff"/>
-        <rect x="88" y="55" width="24" height="60" fill="#e51c23" rx="2"/>
-        <rect x="70" y="73" width="60" height="24" fill="#e51c23" rx="2"/>
-        <path d="M 60 115 C 75 135, 100 138, 100 138 C 100 138, 125 135, 140 115 C 120 128, 100 128, 100 128 C 100 128, 80 128, 60 115 Z" fill="#4caf50"/>
-        <path d="M 40 130 Q 100 165 160 130 A 95 95 0 0 1 40 130 Z" fill="#0066b2"/>
-        <text x="100" y="162" fill="#ffffff" font-size="18" font-weight="900" font-family="Arial" text-anchor="middle">VNPT</text>
+        
+        <!-- 2 Ngôi sao 5 cánh 2 bên -->
+        <polygon points="35,100 37,105 42,105 38,108 39,113 35,110 31,113 32,108 28,105 33,105" fill="#ffffff"/>
+        <polygon points="165,100 167,105 172,105 168,108 169,113 165,110 161,113 162,108 158,105 163,105" fill="#ffffff"/>
+        
+        <!-- Chữ VNPT bên dưới -->
+        <text x="100" y="174" fill="#ffffff" font-size="16" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="2">VNPT</text>
+        
+        <!-- Dấu Thập Đỏ -->
+        <rect x="87" y="58" width="26" height="64" fill="#e51c23" rx="2"/>
+        <rect x="68" y="77" width="64" height="26" fill="#e51c23" rx="2"/>
+        
+        <!-- 2 Bàn tay Xanh Lá Nâng Đỡ -->
+        <path d="M 61 115 C 72 138, 100 148, 100 148 C 100 148, 128 138, 139 115 C 122 135, 100 132, 100 132 C 100 132, 78 135, 61 115 Z" fill="#7cb342"/>
+        <path d="M 77 121 C 88 132, 100 135, 100 135 C 100 135, 112 132, 123 121 C 112 127, 100 126, 100 126 C 100 126, 88 127, 77 121 Z" fill="#7cb342"/>
     </svg>
 </div>
 """, unsafe_allow_html=True)
