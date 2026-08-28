@@ -87,7 +87,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON & TRUY VẤN KHÔNG LƯU CACHE
+# 2. KẾT NỐI DATABASE NEON & TỰ ĐỘNG CẬP NHẬT CỘT LỖI
 # ---------------------------------------------------------
 def get_db_engine():
     try:
@@ -104,11 +104,12 @@ def get_db_engine():
             return None
 
         with eng.connect() as conn:
+            # Tạo bảng nếu chưa có
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS can_bo (
                     id SERIAL PRIMARY KEY,
-                    ma_cb VARCHAR(50) UNIQUE NOT NULL,
-                    ho_ten VARCHAR(255) NOT NULL,
+                    ma_cb VARCHAR(50) UNIQUE,
+                    ho_ten VARCHAR(255),
                     chuc_danh VARCHAR(100),
                     khoa_phong VARCHAR(255),
                     trinh_do VARCHAR(100),
@@ -117,6 +118,23 @@ def get_db_engine():
                 );
             """))
             conn.commit()
+
+            # Tự động nâng cấp cột nếu bảng cũ bị thiếu cột ma_cb hoặc các cột khác
+            columns_to_check = [
+                ("ma_cb", "VARCHAR(50)"),
+                ("ho_ten", "VARCHAR(255)"),
+                ("chuc_danh", "VARCHAR(100)"),
+                ("khoa_phong", "VARCHAR(255)"),
+                ("trinh_do", "VARCHAR(100)"),
+                ("so_dien_thoai", "VARCHAR(20)"),
+                ("email", "VARCHAR(100)")
+            ]
+            for col_name, col_type in columns_to_check:
+                conn.execute(text(f"""
+                    ALTER TABLE can_bo ADD COLUMN IF NOT EXISTS {col_name} {col_type};
+                """))
+            conn.commit()
+
         return eng
     except Exception as e:
         st.error(f"Lỗi kết nối CSDL: {e}")
@@ -124,7 +142,7 @@ def get_db_engine():
 
 engine = get_db_engine()
 
-# Hàm truy vấn đọc trực tiếp từ DB không lưu Cache
+# Hàm truy vấn đọc trực tiếp từ DB
 def load_data_from_db():
     if not engine:
         return pd.DataFrame()
@@ -246,7 +264,7 @@ def render_dashboard_home():
         st.plotly_chart(fig_donut, use_container_width=True)
 
 # ---------------------------------------------------------
-# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (ÉP TỰ ĐỘNG TẢI LẠI TRANG)
+# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV
 # ---------------------------------------------------------
 def render_quan_ly_can_bo():
     st.markdown("---")
@@ -256,7 +274,6 @@ def render_quan_ly_can_bo():
         st.error("Chưa kết nối được Cơ sở dữ liệu Neon. Vui lòng kiểm tra lại cấu hình Secrets.")
         return
 
-    # Lấy dữ liệu thực tế từ DB
     df = load_data_from_db()
 
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -322,7 +339,7 @@ def render_quan_ly_can_bo():
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
                             st.rerun()
                         except Exception as ex:
-                            st.error(f"Lỗi: Mã Cán bộ [{ma_cb}] đã tồn tại ({ex})")
+                            st.error(f"Lỗi thêm mới: {ex}")
 
         else:
             if df.empty:
@@ -336,8 +353,8 @@ def render_quan_ly_can_bo():
                 
                 with st.form("form_edit_member"):
                     c1, c2 = st.columns(2)
-                    ma_cb = c1.text_input("Mã Cán bộ (*)", value=str(curr_row['ma_cb']))
-                    ho_ten = c2.text_input("Họ và Tên (*)", value=str(curr_row['ho_ten']))
+                    ma_cb = c1.text_input("Mã Cán bộ (*)", value=str(curr_row['ma_cb'] or ''))
+                    ho_ten = c2.text_input("Họ và Tên (*)", value=str(curr_row['ho_ten'] or ''))
                     
                     list_cd = ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Kỹ thuật viên", "Hành chính", "Khác"]
                     cd_idx = list_cd.index(curr_row['chuc_danh']) if curr_row['chuc_danh'] in list_cd else 0
@@ -407,7 +424,6 @@ def render_quan_ly_can_bo():
             if uploaded_file is not None:
                 try:
                     df_up = pd.read_excel(uploaded_file, engine='openpyxl')
-                    # Làm sạch tên cột
                     df_up.columns = [str(c).strip() for c in df_up.columns]
                     
                     st.markdown("**Xem trước dữ liệu từ file:**")
@@ -416,7 +432,6 @@ def render_quan_ly_can_bo():
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
                         count_success = 0
                         
-                        # Áp dụng tự động tìm cột linh hoạt
                         col_map = {str(c).lower().strip(): c for c in df_up.columns}
                         
                         col_macb = col_map.get('mã cán bộ') or col_map.get('ma_cb') or col_map.get('mã cb') or df_up.columns[0]
@@ -442,17 +457,19 @@ def render_quan_ly_can_bo():
                                         conn.execute(text("""
                                             INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                             VALUES (:m, :h, :c, :k, :t, :s, :e)
-                                            ON CONFLICT (ma_cb) DO UPDATE 
-                                            SET ho_ten = EXCLUDED.ho_ten,
-                                                chuc_danh = EXCLUDED.chuc_danh,
-                                                khoa_phong = EXCLUDED.khoa_phong,
-                                                trinh_do = EXCLUDED.trinh_do,
-                                                so_dien_thoai = EXCLUDED.so_dien_thoai,
-                                                email = EXCLUDED.email
                                         """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
                                         count_success += 1
                                     except Exception as ex_item:
-                                        pass
+                                        # Nếu trùng mã cán bộ thì tiến hành update
+                                        try:
+                                            conn.execute(text("""
+                                                UPDATE can_bo 
+                                                SET ho_ten = :h, chuc_danh = :c, khoa_phong = :k, trinh_do = :t, so_dien_thoai = :s, email = :e
+                                                WHERE ma_cb = :m
+                                            """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                            count_success += 1
+                                        except Exception:
+                                            pass
                             conn.commit()
                             
                         if count_success > 0:
