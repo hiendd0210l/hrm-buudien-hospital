@@ -300,7 +300,7 @@ def render_quan_ly_can_bo():
                 st.error(f"Lỗi khi làm sạch CSDL: {e_clean}")
 
         if df.empty:
-            st.info("Chưa có dữ liệu nhân sự trong CSDL. Bạn có thể thêm mới hoặc nhập từ file Excel.")
+            st.info("Chưa có dữ liệu nhân sự trong CSDL. Bạn có thể thêm mới hoặc nhập từ file Excel mẫu 2C-BNV.")
         else:
             display_df = df.drop(columns=['id']).copy()
             display_df.columns = [
@@ -346,14 +346,14 @@ def render_quan_ly_can_bo():
         if action_mode == "➕ Thêm Nhân sự Mới":
             with st.form("form_add_member", clear_on_submit=True):
                 c1, c2 = st.columns(2)
-                ma_can_bo = c1.text_input("Mã Cán bộ (*)", placeholder="Ví dụ: CB001")
-                ho_ten = c2.text_input("Họ và Tên (*)", placeholder="Ví dụ: Nguyễn Văn A")
-                ngay_sinh = c1.date_input("Ngày sinh", value=datetime(1990, 1, 1))
-                so_cccd = c2.text_input("Số CCCD / CMND", placeholder="Ví dụ: 001090001234")
-                chuc_danh = c1.selectbox("Chức danh", ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Kỹ thuật viên", "Hành chính", "Khác"])
-                khoa_phong = c2.text_input("Khoa / Phòng", placeholder="Ví dụ: Khoa Cấp cứu")
-                trinh_do = c1.selectbox("Trình độ", ["Tiến sĩ", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp", "Khác"])
-                sdt = c2.text_input("Số điện thoại")
+                ma_can_bo = c1.text_input("Mã Cán bộ (*)", placeholder="Ví dụ: N0003")
+                ho_ten = c2.text_input("Họ và Tên (*)", placeholder="Ví dụ: Trần Hùng Mạnh")
+                ngay_sinh = c1.date_input("Ngày sinh", value=datetime(1967, 1, 1))
+                so_cccd = c2.text_input("Số CCCD / CMND", placeholder="Ví dụ: 12243422")
+                chuc_danh = c1.selectbox("Chức danh / Chức vụ", ["Chủ tịch HĐQL, Giám đốc", "Phó Giám đốc", "Trưởng phòng", "Phó trưởng phòng", "Nhân viên"])
+                khoa_phong = c2.text_input("Khoa / Phòng", placeholder="Ví dụ: Ban Giám đốc")
+                trinh_do = c1.selectbox("Trình độ chuyên môn", ["Thạc sĩ, Bác sĩ CKII", "Thạc sĩ kinh tế", "Kỹ sư điện tử viễn thông", "Cử nhân Quản lý kinh doanh", "Đại học", "Khác"])
+                sdt = c2.text_input("Số điện thoại", placeholder="Ví dụ: 912222606")
                 email = c1.text_input("Email")
                 
                 btn_add = st.form_submit_button("💾 Lưu Nhân sự Mới")
@@ -398,15 +398,9 @@ def render_quan_ly_can_bo():
                     ngay_sinh = c1.date_input("Ngày sinh", value=val_ns)
                     so_cccd = c2.text_input("Số CCCD / CMND", value=str(curr_row['so_cccd'] or ''))
                     
-                    list_cd = ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Kỹ thuật viên", "Hành chính", "Khác"]
-                    cd_idx = list_cd.index(curr_row['chuc_danh']) if curr_row['chuc_danh'] in list_cd else 0
-                    chuc_danh = c1.selectbox("Chức danh", list_cd, index=cd_idx)
-                    
+                    chuc_danh = c1.text_input("Chức vụ", value=str(curr_row['chuc_danh'] or ''))
                     khoa_phong = c2.text_input("Khoa / Phòng", value=str(curr_row['khoa_phong'] or ''))
-                    
-                    list_td = ["Tiến sĩ", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp", "Khác"]
-                    td_idx = list_td.index(curr_row['trinh_do']) if curr_row['trinh_do'] in list_td else 0
-                    trinh_do = c1.selectbox("Trình độ", list_td, index=td_idx)
+                    trinh_do = c1.text_input("Trình độ chuyên môn", value=str(curr_row['trinh_do'] or ''))
                     
                     sdt = c2.text_input("Số điện thoại", value=str(curr_row['so_dien_thoai'] or ''))
                     email = c1.text_input("Email", value=str(curr_row['email'] or ''))
@@ -433,45 +427,75 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ẨN HOÀN TOÀN PHẦN KHỚP NỐI THỦ CÔNG)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÚNG CHUẨN SƠ YẾU LÝ LỊCH 2C-BNV)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
         with col_m1:
-            st.markdown("##### 📥 **1. Tải về file Excel mẫu chuẩn**")
-            st.caption("Hãy sử dụng đúng file mẫu chuẩn này để hệ thống tự động nhận diện dữ liệu chính xác.")
+            st.markdown("##### 📥 **1. Tải về file Excel mẫu chuẩn 2C-BNV**")
+            st.caption("Mẫu chuẩn đầy đủ các trường theo Sơ yếu lý lịch Bộ Nội Vụ (BV Bưu Điện).")
             
-            sample_df = pd.DataFrame({
-                'Mã Cán bộ': ['CB001', 'CB002'],
-                'Họ và Tên': ['Nguyễn Văn A', 'Trần Thị B'],
-                'Ngày sinh': ['1990-01-15', '1992-05-20'],
-                'Số CCCD': ['001090001234', '001092005678'],
-                'Chức danh': ['Bác sĩ', 'Điều dưỡng'],
-                'Khoa / Phòng': ['Khoa Cấp cứu', 'Khoa Nội'],
-                'Trình độ': ['Thạc sĩ / CKI', 'Đại học'],
-                'Số điện thoại': ['0912345678', '0987654321'],
-                'Email': ['nguyenvana@gmail.com', 'tranthib@gmail.com']
+            # Tạo file mẫu chuẩn đúng các cột như yêu cầu mẫu kèm theo
+            sample_2c_df = pd.DataFrame({
+                'Ma_NV': ['N0003', 'N0009', 'N0125'],
+                'Ho_Ten': ['Trần Hùng Mạnh', 'Phạm Thị Thanh Tú', 'Phạm Trường Giang'],
+                'Ten_Goi_Khac': ['BVBD000628', 'BVBD000630', 'BVBD000092'],
+                'Ma_NV.1': ['N0003', 'N0009', 'N0125'],
+                'Ngay_Sinh': ['01/01/1967', '17/09/1975', '11/07/1975'],
+                'Gioi_Tinh': ['Nam', 'Nữ', 'Nam'],
+                'Noi_Sinh': ['Nghệ An', 'Hà Nội', 'Hà Nam'],
+                'Que_Quan': ['Nghệ Tĩnh', 'Hà Nội', 'Hà Nam'],
+                'Dan_Toc': ['Kinh (Việt)', 'Kinh (Việt)', 'Kinh (Việt)'],
+                'Ton_Giao': ['Không', 'Không', 'Không'],
+                'Noi_O_Hien_Nay': ['P 501 CT8 Định Công', '', 'Số 40, ngõ 161 Thái Hà'],
+                'Dien_Thoai': ['912222606', '916369699', '906528686'],
+                'So_CCCD': ['12243422', '1175014697', '1075022616'],
+                'Khoa_Phong': ['Ban Giám đốc', 'Ban Giám đốc', 'Ban Giám đốc'],
+                'Chuc_Vu': ['Chủ tịch HĐQL, Giám đốc', 'Phó Giám đốc', 'Phó Giám đốc'],
+                'Ngach_Vien_Chuc': ['Viên chức A2', 'Viên chức A1', 'Viên chức A1'],
+                'Bac_Luong': ['8/8', '9/9', '9/9'],
+                'He_So_Luong': ['6.78', '4.98', '4.98'],
+                'Ngay_Nang_Luong': ['2025-09-01', '2025-08-01', '2025-09-01'],
+                'Trinh_Do_Giao_Duc': ['12 / 12', '12 / 12', '12 / 12'],
+                'Trinh_Do_Chuyen_Mon': ['Thạc sĩ, Bác sĩ CKII', 'Thạc sĩ kinh tế', 'Thạc sĩ, Bác sĩ CKII'],
+                'Ly_Luan_Chinh_Tri': [None, None, None],
+                'Ngoai_Ngu': [None, None, None],
+                'Tin_Hoc': [None, None, None],
+                'So_CCHN': ['005542/BYT-CCHN', None, '0013785/BYT-CCHN'],
+                'Gio_CME': [None, None, None],
+                'Ngay_Vao_Dang': ['29/10/2004', '15/02/2001', '15/03/2012'],
+                'Ngay_Nhap_Ngu': [None, None, None],
+                'Danh_Hieu_Phong_Tang': [None, None, None],
+                'Khen_Thuong_Ky_Luat': [None, None, None],
+                'Suc_Khoe_Thuong_Binh': [None, None, None],
+                'Loai_HD': ['Không có thời hạn xác định', 'Không có thời hạn xác định', 'Không có thời hạn xác định'],
+                'Ngay_Het_Han_HD': [None, None, None],
+                'Trang_Thai': ['Chính thức', 'Chính thức', 'Chính thức']
             })
             
             output_sample = io.BytesIO()
             with pd.ExcelWriter(output_sample, engine='openpyxl') as writer:
-                sample_df.to_excel(writer, index=False, sheet_name='Mau_Nhan_Su')
+                sample_2c_df.to_excel(writer, index=False, sheet_name='Mau_2C_BNV')
             
             st.download_button(
-                label="📄 Tải Mẫu Excel Chuẩn (.xlsx)",
+                label="📄 Tải Mẫu Sơ Yếu Lý Lịch 2C - BNV (.xlsx)",
                 data=output_sample.getvalue(),
-                file_name="Mau_Danh_Sach_Nhan_Su_BVBD.xlsx",
+                file_name="Mau_Ly_Lich_2C_BNV.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
 
         with col_m2:
-            st.markdown("##### 📤 **2. Tải lên file Excel để nhập dữ liệu**")
-            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx) để upload:", type=['xlsx', 'xls'], key="excel_uploader_direct")
+            st.markdown("##### 📤 **2. Tải lên file Excel theo mẫu 2C-BNV**")
+            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx) chuẩn 2C-BNV:", type=['xlsx', 'xls'], key="excel_uploader_2c")
             
             if uploaded_file is not None:
                 try:
-                    df_up = pd.read_excel(uploaded_file)
+                    # Đọc sheet đầu tiên hoặc đúng tên 'Mau_2C_BNV'
+                    xls_file = pd.ExcelFile(uploaded_file)
+                    sheet_to_read = 'Mau_2C_BNV' if 'Mau_2C_BNV' in xls_file.sheet_names else xls_file.sheet_names[0]
+                    df_up = pd.read_excel(uploaded_file, sheet_name=sheet_to_read)
+                    
                     st.markdown(f"**Xem trước dữ liệu (Tổng số dòng: {len(df_up)}):**")
                     st.dataframe(df_up.head(5), use_container_width=True, hide_index=True)
                     
@@ -479,39 +503,29 @@ def render_quan_ly_can_bo():
 
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True, type="primary"):
                         count_inserted = 0
-                        error_logs = []
-                        
-                        # Tự động ánh xạ các cột dựa theo file mẫu chuẩn
                         col_list = list(df_up.columns)
                         
-                        def get_col_val(row_item, possible_names):
-                            for name in possible_names:
-                                for col in col_list:
-                                    if name.lower() in str(col).lower():
-                                        val = row_item[col]
-                                        if pd.notna(val):
-                                            s_val = str(val).strip()
-                                            if s_val.lower() not in ['nan', 'none', '', 'null']:
-                                                if s_val.endswith('.0'):
-                                                    s_val = s_val[:-2]
-                                                return s_val
+                        def get_exact_val(row_item, col_name):
+                            if col_name in col_list:
+                                val = row_item[col_name]
+                                if pd.notna(val):
+                                    s_val = str(val).strip()
+                                    if s_val.lower() not in ['nan', 'none', '', 'null']:
+                                        if s_val.endswith('.0'):
+                                            s_val = s_val[:-2]
+                                        return s_val
                             return None
 
                         with engine.connect() as conn:
                             for idx, row in df_up.iterrows():
                                 try:
-                                    h_val = get_col_val(row, ['ho và tên', 'ho ten', 'họ tên', 'ten', 'fullname'])
+                                    h_val = get_exact_val(row, 'Ho_Ten')
                                     if not h_val:
                                         continue
                                         
-                                    m_val = get_col_val(row, ['mã cán bộ', 'ma can bo', 'mcb', 'ma nv', 'mã nhân viên']) or f"CB{idx+1:04d}"
+                                    m_val = get_exact_val(row, 'Ma_NV') or f"N{idx+1:04d}"
                                     
-                                    raw_ns = None
-                                    for col in col_list:
-                                        if 'ngày sinh' in str(col).lower() or 'ngay sinh' in str(col).lower() or 'ns' in str(col).lower():
-                                            raw_ns = row[col]
-                                            break
-                                    
+                                    raw_ns = row.get('Ngay_Sinh')
                                     ns_val = None
                                     if pd.notna(raw_ns):
                                         try:
@@ -522,12 +536,14 @@ def render_quan_ly_can_bo():
                                         except Exception:
                                             ns_val = None
 
-                                    cccd_val = get_col_val(row, ['cccd', 'cmnd', 'số cccd'])
-                                    cd_val = get_col_val(row, ['chức danh', 'chuc danh', 'chức vụ', 'vị trí'])
-                                    kp_val = get_col_val(row, ['khoa', 'phòng', 'khoa / phòng', 'khoaphong'])
-                                    td_val = get_col_val(row, ['trình độ', 'trinh do', 'bằng cấp'])
-                                    sdt_val = get_col_val(row, ['điện thoại', 'dien thoai', 'sdt', 'phone'])
-                                    email_val = get_col_val(row, ['email', 'mail'])
+                                    cccd_val = get_exact_val(row, 'So_CCCD')
+                                    cd_val = get_exact_val(row, 'Chuc_Vu')
+                                    kp_val = get_exact_val(row, 'Khoa_Phong')
+                                    td_val = get_exact_val(row, 'Trinh_Do_Chuyen_Mon')
+                                    sdt_val = get_exact_val(row, 'Dien_Thoai')
+                                    
+                                    # Lấy email hoặc để trống nếu không có cột email trực tiếp trong 2C
+                                    email_val = get_exact_val(row, 'Email') if 'Email' in col_list else None
 
                                     conn.execute(text("""
                                         INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
@@ -538,38 +554,38 @@ def render_quan_ly_can_bo():
                                     })
                                     count_inserted += 1
                                 except Exception as row_ex:
-                                    error_logs.append(f"Dòng {idx+1}: {str(row_ex)}")
+                                    print(f"Lỗi dòng {idx+1}: {row_ex}")
                             
                             conn.commit()
                         
                         if count_inserted > 0:
                             st.cache_data.clear()
-                            st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự vào cơ sở dữ liệu Neon!")
+                            st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự theo mẫu Sơ yếu lý lịch 2C-BNV vào CSDL!")
                             st.balloons()
                             st.rerun()
                         else:
-                            st.error("❌ Không chèn được dữ liệu nào. Vui lòng đảm bảo file upload sử dụng đúng định dạng mẫu chuẩn.")
+                            st.error("❌ Không chèn được dữ liệu nào. Vui lòng kiểm tra lại cấu trúc file.")
 
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
 
     # TAB 4: XUẤT EXCEL
     with tab4:
-        st.markdown("##### 📊 **Tải toàn bộ dữ liệu Cán bộ CNV ra file Excel**")
+        st.markdown("##### 📊 **Tải toàn bộ dữ liệu Cán bộ CNV ra file Excel chuẩn 2C-BNV**")
         if df.empty:
             st.info("Chưa có dữ liệu để xuất file.")
         else:
             export_df = df[['ma_can_bo', 'ho_ten', 'ngay_sinh', 'so_cccd', 'chuc_danh', 'khoa_phong', 'trinh_do', 'so_dien_thoai', 'email']].copy()
-            export_df.columns = ['Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Số CCCD', 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email']
+            export_df.columns = ['Ma_NV', 'Ho_Ten', 'Ngay_Sinh', 'So_CCCD', 'Chuc_Vu', 'Khoa_Phong', 'Trinh_Do_Chuyen_Mon', 'Dien_Thoai', 'Email']
             
             output_exp = io.BytesIO()
             with pd.ExcelWriter(output_exp, engine='openpyxl') as writer:
-                export_df.to_excel(writer, index=False, sheet_name='Nhan_Su_BV_Buu_Dien')
+                export_df.to_excel(writer, index=False, sheet_name='Mau_2C_BNV')
             
             st.download_button(
-                label="📥 Tải Danh sách Nhân sự Đầy Đủ Cột (.xlsx)",
+                label="📥 Tải Danh sách Nhân sự Đầy Đủ Cột (Chuẩn 2C-BNV .xlsx)",
                 data=output_exp.getvalue(),
-                file_name="Danh_Sach_Nhan_Su_BV_Buu_Dien.xlsx",
+                file_name="Danh_Sach_Nhan_Su_Chuan_2C_BNV.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
