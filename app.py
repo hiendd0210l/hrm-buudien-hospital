@@ -5,6 +5,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
+from datetime import datetime
 from sqlalchemy import create_engine, text
 
 # ---------------------------------------------------------
@@ -87,7 +88,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON
+# 2. KẾT NỐI DATABASE NEON & TỰ ĐỘNG SỬA SCHEMA
 # ---------------------------------------------------------
 def get_db_engine():
     try:
@@ -109,6 +110,7 @@ def get_db_engine():
                     id SERIAL PRIMARY KEY,
                     ma_can_bo VARCHAR(50),
                     ho_ten VARCHAR(255),
+                    ngay_sinh DATE,
                     chuc_danh VARCHAR(100),
                     khoa_phong VARCHAR(255),
                     trinh_do VARCHAR(100),
@@ -118,9 +120,11 @@ def get_db_engine():
             """))
             conn.commit()
 
+            # Thêm cột nếu thiếu
             columns_to_check = [
                 ("ma_can_bo", "VARCHAR(50)"),
                 ("ho_ten", "VARCHAR(255)"),
+                ("ngay_sinh", "DATE"),
                 ("chuc_danh", "VARCHAR(100)"),
                 ("khoa_phong", "VARCHAR(255)"),
                 ("trinh_do", "VARCHAR(100)"),
@@ -129,6 +133,13 @@ def get_db_engine():
             ]
             for col_name, col_type in columns_to_check:
                 conn.execute(text(f"ALTER TABLE can_bo ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
+            
+            # Gỡ bỏ constraint NOT NULL ở cột ngay_sinh để tránh lỗi upload
+            try:
+                conn.execute(text("ALTER TABLE can_bo ALTER COLUMN ngay_sinh DROP NOT NULL;"))
+            except Exception:
+                pass
+
             conn.commit()
 
         return eng
@@ -143,7 +154,7 @@ def load_data_from_db():
         return pd.DataFrame()
     try:
         with engine.connect() as conn:
-            query = text("SELECT id, ma_can_bo, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email FROM can_bo ORDER BY id DESC")
+            query = text("SELECT id, ma_can_bo, ho_ten, ngay_sinh, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email FROM can_bo ORDER BY id DESC")
             df = pd.read_sql(query, conn)
             return df
     except Exception as e:
@@ -316,11 +327,12 @@ def render_quan_ly_can_bo():
                 c1, c2 = st.columns(2)
                 ma_can_bo = c1.text_input("Mã Cán bộ (*)", placeholder="Ví dụ: CB001")
                 ho_ten = c2.text_input("Họ và Tên (*)", placeholder="Ví dụ: Nguyễn Văn A")
-                chuc_danh = c1.selectbox("Chức danh", ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Kỹ thuật viên", "Hành chính", "Khác"])
-                khoa_phong = c2.text_input("Khoa / Phòng", placeholder="Ví dụ: Khoa Cấp cứu")
-                trinh_do = c1.selectbox("Trình độ", ["Tiến sĩ", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp", "Khác"])
-                sdt = c2.text_input("Số điện thoại")
-                email = c1.text_input("Email")
+                ngay_sinh = c1.date_input("Ngày sinh", value=datetime(1990, 1, 1))
+                chuc_danh = c2.selectbox("Chức danh", ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Kỹ thuật viên", "Hành chính", "Khác"])
+                khoa_phong = c1.text_input("Khoa / Phòng", placeholder="Ví dụ: Khoa Cấp cứu")
+                trinh_do = c2.selectbox("Trình độ", ["Tiến sĩ", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp", "Khác"])
+                sdt = c1.text_input("Số điện thoại")
+                email = c2.text_input("Email")
                 
                 btn_add = st.form_submit_button("💾 Lưu Nhân sự Mới")
                 
@@ -331,9 +343,9 @@ def render_quan_ly_can_bo():
                         try:
                             with engine.connect() as conn:
                                 conn.execute(text("""
-                                    INSERT INTO can_bo (ma_can_bo, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
-                                    VALUES (:m, :h, :c, :k, :t, :s, :e)
-                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email})
+                                    INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                    VALUES (:m, :h, :ns, :c, :k, :t, :s, :e)
+                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email})
                                 conn.commit()
                             st.cache_data.clear()
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
@@ -356,18 +368,21 @@ def render_quan_ly_can_bo():
                     ma_can_bo = c1.text_input("Mã Cán bộ (*)", value=str(curr_row['ma_can_bo'] or ''))
                     ho_ten = c2.text_input("Họ và Tên (*)", value=str(curr_row['ho_ten'] or ''))
                     
+                    val_ns = curr_row['ngay_sinh'] if pd.notna(curr_row['ngay_sinh']) else datetime(1990, 1, 1)
+                    ngay_sinh = c1.date_input("Ngày sinh", value=val_ns)
+                    
                     list_cd = ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Kỹ thuật viên", "Hành chính", "Khác"]
                     cd_idx = list_cd.index(curr_row['chuc_danh']) if curr_row['chuc_danh'] in list_cd else 0
-                    chuc_danh = c1.selectbox("Chức danh", list_cd, index=cd_idx)
+                    chuc_danh = c2.selectbox("Chức danh", list_cd, index=cd_idx)
                     
-                    khoa_phong = c2.text_input("Khoa / Phòng", value=str(curr_row['khoa_phong'] or ''))
+                    khoa_phong = c1.text_input("Khoa / Phòng", value=str(curr_row['khoa_phong'] or ''))
                     
                     list_td = ["Tiến sĩ", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp", "Khác"]
                     td_idx = list_td.index(curr_row['trinh_do']) if curr_row['trinh_do'] in list_td else 0
-                    trinh_do = c1.selectbox("Trình độ", list_td, index=td_idx)
+                    trinh_do = c2.selectbox("Trình độ", list_td, index=td_idx)
                     
-                    sdt = c2.text_input("Số điện thoại", value=str(curr_row['so_dien_thoai'] or ''))
-                    email = c1.text_input("Email", value=str(curr_row['email'] or ''))
+                    sdt = c1.text_input("Số điện thoại", value=str(curr_row['so_dien_thoai'] or ''))
+                    email = c2.text_input("Email", value=str(curr_row['email'] or ''))
                     
                     btn_update = st.form_submit_button("🔄 Cập nhật Thông tin")
                     
@@ -376,10 +391,10 @@ def render_quan_ly_can_bo():
                             with engine.connect() as conn:
                                 conn.execute(text("""
                                     UPDATE can_bo 
-                                    SET ma_can_bo = :m, ho_ten = :h, chuc_danh = :c, khoa_phong = :k, 
-                                        trinh_do = :t, so_dien_thoai = :s, email = :e
+                                    SET ma_can_bo = :m, ho_ten = :h, ngay_sinh = :ns, chuc_danh = :c, 
+                                        khoa_phong = :k, trinh_do = :t, so_dien_thoai = :s, email = :e
                                     WHERE id = :id
-                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email, "id": edit_id})
+                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email, "id": edit_id})
                                 conn.commit()
                             st.cache_data.clear()
                             st.success("Đã cập nhật thông tin thành công!")
@@ -387,7 +402,7 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ CẬP NHẬT CHÍNH XÁC MÃ CÁN BỘ)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ XỬ LÝ CỘT NGÀY SINH TỰ ĐỘNG)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -398,6 +413,7 @@ def render_quan_ly_can_bo():
             sample_df = pd.DataFrame({
                 'Mã Cán bộ': ['CB001', 'CB002'],
                 'Họ và Tên': ['Nguyễn Văn A', 'Trần Thị B'],
+                'Ngày sinh': ['1990-01-15', '1992-05-20'],
                 'Chức danh': ['Bác sĩ', 'Điều dưỡng'],
                 'Khoa / Phòng': ['Khoa Cấp cứu', 'Khoa Nội'],
                 'Trình độ': ['Thạc sĩ / CKI', 'Đại học'],
@@ -440,6 +456,7 @@ def render_quan_ly_can_bo():
 
                         c_macb = get_col(['macanbo', 'mcb', 'manhanvien', 'manv', 'stt', 'id'])
                         c_hoten = get_col(['hovaten', 'hoten', 'tencanbo', 'tennhanvien', 'fullname', 'ten'])
+                        c_ngaysinh = get_col(['ngaysinh', 'ns', 'dob', 'dateofbirth'])
                         c_chucdanh = get_col(['chucdanh', 'chucvu', 'vitri'])
                         c_khoaphong = get_col(['khoaphong', 'khoa', 'phong', 'phongban', 'donvi'])
                         c_trinhdo = get_col(['trinhdo', 'bangcap', 'hocluc'])
@@ -455,12 +472,20 @@ def render_quan_ly_can_bo():
                             for idx, row in df_up.iterrows():
                                 h = str(row[c_hoten]).strip() if c_hoten and pd.notna(row[c_hoten]) else ''
                                 
-                                # Kiểm tra mã cán bộ từ file Excel
+                                # Mã Cán bộ
                                 raw_m = str(row[c_macb]).strip() if c_macb and pd.notna(row[c_macb]) else ''
                                 if not raw_m or raw_m.lower() == 'nan':
                                     m = f"CB{idx+1:04d}"
                                 else:
                                     m = raw_m
+
+                                # Ngày sinh: Xử lý định dạng & NULL
+                                ns_val = None
+                                if c_ngaysinh and pd.notna(row[c_ngaysinh]):
+                                    try:
+                                        ns_val = pd.to_datetime(row[c_ngaysinh]).date()
+                                    except Exception:
+                                        ns_val = None
 
                                 c = str(row[c_chucdanh]).strip() if c_chucdanh and pd.notna(row[c_chucdanh]) else ''
                                 k = str(row[c_khoaphong]).strip() if c_khoaphong and pd.notna(row[c_khoaphong]) else ''
@@ -469,22 +494,19 @@ def render_quan_ly_can_bo():
                                 e = str(row[c_email]).strip() if c_email and pd.notna(row[c_email]) else ''
 
                                 if h and h.lower() != 'nan':
-                                    # Kiểm tra xem ma_can_bo đã tồn tại chưa
                                     check_res = conn.execute(text("SELECT id FROM can_bo WHERE ma_can_bo = :m"), {"m": m}).fetchone()
                                     if check_res:
-                                        # Nếu đã có -> Cập nhật
                                         conn.execute(text("""
                                             UPDATE can_bo SET 
-                                                ho_ten = :h, chuc_danh = :c, khoa_phong = :k, 
+                                                ho_ten = :h, ngay_sinh = :ns, chuc_danh = :c, khoa_phong = :k, 
                                                 trinh_do = :t, so_dien_thoai = :s, email = :e
                                             WHERE ma_can_bo = :m
-                                        """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                        """), {"m": m, "h": h, "ns": ns_val, "c": c, "k": k, "t": t, "s": s, "e": e})
                                     else:
-                                        # Nếu chưa có -> Thêm mới vào cột ma_can_bo
                                         conn.execute(text("""
-                                            INSERT INTO can_bo (ma_can_bo, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
-                                            VALUES (:m, :h, :c, :k, :t, :s, :e)
-                                        """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                            INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                            VALUES (:m, :h, :ns, :c, :k, :t, :s, :e)
+                                        """), {"m": m, "h": h, "ns": ns_val, "c": c, "k": k, "t": t, "s": s, "e": e})
                                     count_inserted += 1
                             
                             conn.commit()
@@ -506,8 +528,8 @@ def render_quan_ly_can_bo():
         if df.empty:
             st.info("Chưa có dữ liệu để xuất file.")
         else:
-            export_df = df[['ma_can_bo', 'ho_ten', 'chuc_danh', 'khoa_phong', 'trinh_do', 'so_dien_thoai', 'email']].copy()
-            export_df.columns = ['Mã Cán bộ', 'Họ và Tên', 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email']
+            export_df = df[['ma_can_bo', 'ho_ten', 'ngay_sinh', 'chuc_danh', 'khoa_phong', 'trinh_do', 'so_dien_thoai', 'email']].copy()
+            export_df.columns = ['Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email']
             
             output_exp = io.BytesIO()
             with pd.ExcelWriter(output_exp, engine='openpyxl') as writer:
