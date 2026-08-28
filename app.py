@@ -1,6 +1,7 @@
 import os
 import base64
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 from sqlalchemy import create_engine, text
@@ -15,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS TỐI ƯU GIAO DIỆN & TĂNG KÍCH THƯỚC CHỮ, KHUNG BO TRÒN
+# CSS TỐI ƯU GIAO DIỆN & KHUNG BO TRÒN CONTAINER/FORM
 st.markdown("""
 <style>
     /* Nền tổng thể trang */
@@ -23,8 +24,8 @@ st.markdown("""
         background-color: #f1f5f9 !important;
     }
 
-    /* ĐỊNH DẠNG KHUNG CONTAINER BO TRÒN ĐÚNG THEO ẢNH */
-    [data-testid="stVerticalBlockBorderWrapper"] {
+    /* ĐỊNH DẠNG KHUNG CONTAINER BO TRÒN */
+    [data-testid="stVerticalBlockBorderWrapper"], form[key="login_form"] {
         background-color: #ffffff !important;
         border-radius: 16px !important;
         border: 1px solid #e2e8f0 !important;
@@ -69,7 +70,7 @@ st.markdown("""
     }
 
     /* CÁC NÚT NHẤN MÀU XANH DƯƠNG CHỮ ĐẬM */
-    .stButton > button {
+    .stButton > button, div[data-testid="stFormSubmitButton"] > button {
         background: linear-gradient(180deg, #0070d2 0%, #0056a3 100%) !important;
         color: #ffffff !important;
         font-weight: 800 !important;
@@ -79,15 +80,16 @@ st.markdown("""
         height: 48px !important;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12) !important;
         transition: all 0.2s ease !important;
+        width: 100% !important;
     }
     
-    .stButton > button p {
+    .stButton > button p, div[data-testid="stFormSubmitButton"] > button p {
         color: #ffffff !important;
         font-weight: 800 !important;
         font-size: 17px !important;
     }
 
-    .stButton > button:hover {
+    .stButton > button:hover, div[data-testid="stFormSubmitButton"] > button:hover {
         background: linear-gradient(180deg, #0080f0 0%, #0062b8 100%) !important;
         border-color: #003366 !important;
         transform: translateY(-1px);
@@ -166,7 +168,7 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (KHUNG BO TRÒN TRỌN VẸN VÀ LOGO, CHỮ TO RÕ)
+# 3. TRANG ĐĂNG NHẬP (HỖ TRỢ ENTER ĐỂ ĐĂNG NHẬP & ESC ĐỂ THOÁT)
 # ---------------------------------------------------------
 def render_login():
     st.markdown("<br>", unsafe_allow_html=True)
@@ -174,8 +176,8 @@ def render_login():
     col_l, col_center, col_r = st.columns([1.5, 2.2, 1.5])
 
     with col_center:
-        # Sử dụng container chuẩn của Streamlit để tạo khung bo quanh toàn bộ nội dung
-        with st.container(border=True):
+        # Bọc form trong st.form để nhấn ENTER tự động Đăng nhập
+        with st.form(key="login_form", clear_on_submit=False):
 
             # 1. LOGO BỆNH VIỆN BƯU ĐIỆN (KÍCH THƯỚC 220PX)
             logo_path = os.path.join(os.path.dirname(__file__), "logo.png") if '__file__' in globals() else "logo.png"
@@ -204,21 +206,44 @@ def render_login():
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # 4. HÀNG NÚT BẤM CÂN BẰNG NẰM TRONG KHUNG
+            # 4. HÀNG NÚT BẤM (BẮT SỰ KIỆN ENTER VÀ ESC)
             b_col1, b_col2 = st.columns(2)
 
             with b_col1:
-                if st.button("🔑 Đăng nhập", key="btn_login", use_container_width=True):
-                    if username == "admin" and password == "admin123":
-                        st.session_state['logged_in'] = True
-                        st.success("Đăng nhập thành công!")
-                        st.rerun()
-                    else:
-                        st.error("❌ Tên đăng nhập hoặc mật khẩu chưa đúng!")
+                # form_submit_button giúp kích hoạt khi gõ ENTER
+                submit_login = st.form_submit_button("🔑 Đăng nhập", use_container_width=True)
 
             with b_col2:
-                if st.button("✕ Thoát", key="btn_exit", use_container_width=True):
-                    st.info("Đã đóng phiên đăng nhập.")
+                # Nút Thoát vẫn giữ trong form
+                submit_exit = st.form_submit_button("✕ Thoát", use_container_width=True)
+
+            # XỬ LÝ LỆNH ĐĂNG NHẬP HOẶC THOÁT
+            if submit_login:
+                if username == "admin" and password == "admin123":
+                    st.session_state['logged_in'] = True
+                    st.success("Đăng nhập thành công!")
+                    st.rerun()
+                else:
+                    st.error("❌ Tên đăng nhập hoặc mật khẩu chưa đúng!")
+
+            if submit_exit:
+                st.info("Đã đóng phiên đăng nhập.")
+
+    # JAVASCRIPT LẮNG NGHE PHÍM ESC BẤM TỰ ĐỘNG THOÁT
+    components.html("""
+    <script>
+        const doc = window.parent.document;
+        doc.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' || e.keyCode === 27) {
+                // Tìm tất cả các nút submit trong form và kích hoạt nút thứ 2 (Nút Thoát)
+                const buttons = doc.querySelectorAll('div[data-testid="stFormSubmitButton"] button');
+                if (buttons.length >= 2) {
+                    buttons[1].click();
+                }
+            }
+        });
+    </script>
+    """, height=0)
 
 # ---------------------------------------------------------
 # 4. GIAO DIỆN DASHBOARD CHÍNH
