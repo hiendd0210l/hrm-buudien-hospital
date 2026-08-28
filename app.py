@@ -188,18 +188,23 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (DÙNG FILE ẢNH LOGO CHUẨN & NÚT 3D)
+# 3. TRANG ĐĂNG NHẬP (SỬA LỖI INDENTATION & CĂN GIỮA LOGO TO)
 # ---------------------------------------------------------
 def render_login():
     st.markdown("<br>", unsafe_allow_html=True)
     
-    col_l, col_center, col_r = st.columns([1.8, 1.4, 1.8])
+    col_l, col_center, col_r = st.columns([1.5, 2.0, 1.5])
 
-   with col_center:
-        # Căn giữa và tăng kích thước logo
-        l_col1, l_col2, l_col3 = st.columns([1, 2, 1])
-        with l_col2:
-            st.image("logo.png", width=220)
+    with col_center:
+        # Căn giữa và chỉnh kích thước logo chuẩn 220px
+        st.markdown(
+            """
+            <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 15px;">
+            """, 
+            unsafe_allow_html=True
+        )
+        st.image("benhvienbuudien logo.png", width=220)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
         st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
