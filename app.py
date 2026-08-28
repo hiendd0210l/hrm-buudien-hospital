@@ -147,7 +147,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON
+# 2. KẾT NỐI DATABASE NEON & TỰ ĐỘNG KHỞI TẠO BẢNG
 # ---------------------------------------------------------
 @st.cache_resource
 def get_db_engine():
@@ -156,30 +156,43 @@ def get_db_engine():
             raw_url = st.secrets["DATABASE_URL"].strip()
             if raw_url.startswith("postgres://"):
                 raw_url = raw_url.replace("postgres://", "postgresql://", 1)
-            return create_engine(raw_url, pool_pre_ping=True)
+            eng = create_engine(raw_url, pool_pre_ping=True)
         elif "postgres" in st.secrets:
             pg = st.secrets["postgres"]
             db_url = f"postgresql://{pg['user']}:{pg['password']}@{pg['host']}:{pg['port']}/{pg['database']}?sslmode=require"
-            return create_engine(db_url, pool_pre_ping=True)
-        return None
-    except Exception:
+            eng = create_engine(db_url, pool_pre_ping=True)
+        else:
+            return None
+
+        # Tự động khởi tạo bảng nếu chưa có
+        with eng.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS can_bo (
+                    id SERIAL PRIMARY KEY,
+                    ma_cb VARCHAR(50) UNIQUE,
+                    ho_ten VARCHAR(255),
+                    chuc_danh VARCHAR(100),
+                    khoa_phong VARCHAR(255)
+                );
+            """))
+            conn.commit()
+        return eng
+    except Exception as e:
+        st.error(f"Lỗi kết nối CSDL: {e}")
         return None
 
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (HỖ TRỢ ENTER ĐỂ ĐĂNG NHẬP & ESC ĐỂ THOÁT)
+# 3. TRANG ĐĂNG NHẬP (HỖ TRỢ ENTER & ESC)
 # ---------------------------------------------------------
 def render_login():
     st.markdown("<br>", unsafe_allow_html=True)
-    
     col_l, col_center, col_r = st.columns([1.5, 2.2, 1.5])
 
     with col_center:
-        # Bọc form trong st.form để nhấn ENTER tự động Đăng nhập
         with st.form(key="login_form", clear_on_submit=False):
 
-            # 1. LOGO BỆNH VIỆN BƯU ĐIỆN (KÍCH THƯỚC 220PX)
             logo_path = os.path.join(os.path.dirname(__file__), "logo.png") if '__file__' in globals() else "logo.png"
 
             if os.path.exists(logo_path):
@@ -196,28 +209,20 @@ def render_login():
             else:
                 st.image("logo.png", width=220)
 
-            # 2. TIÊU ĐỀ
             st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
             st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
 
-            # 3. Ô NHẬP LIỆU
             username = st.text_input("Tên đăng nhập / Username:", placeholder="Nhập tên đăng nhập...")
             password = st.text_input("Mật khẩu / Password:", type="password", placeholder="Nhập mật khẩu...")
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # 4. HÀNG NÚT BẤM (BẮT SỰ KIỆN ENTER VÀ ESC)
             b_col1, b_col2 = st.columns(2)
-
             with b_col1:
-                # form_submit_button giúp kích hoạt khi gõ ENTER
                 submit_login = st.form_submit_button("🔑 Đăng nhập", use_container_width=True)
-
             with b_col2:
-                # Nút Thoát vẫn giữ trong form
                 submit_exit = st.form_submit_button("✕ Thoát", use_container_width=True)
 
-            # XỬ LÝ LỆNH ĐĂNG NHẬP HOẶC THOÁT
             if submit_login:
                 if username == "admin" and password == "admin123":
                     st.session_state['logged_in'] = True
@@ -229,13 +234,11 @@ def render_login():
             if submit_exit:
                 st.info("Đã đóng phiên đăng nhập.")
 
-    # JAVASCRIPT LẮNG NGHE PHÍM ESC BẤM TỰ ĐỘNG THOÁT
     components.html("""
     <script>
         const doc = window.parent.document;
         doc.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' || e.keyCode === 27) {
-                // Tìm tất cả các nút submit trong form và kích hoạt nút thứ 2 (Nút Thoát)
                 const buttons = doc.querySelectorAll('div[data-testid="stFormSubmitButton"] button');
                 if (buttons.length >= 2) {
                     buttons[1].click();
@@ -337,7 +340,8 @@ def render_dashboard():
         with tab_list:
             if engine:
                 try:
-                    df = pd.read_sql("SELECT * FROM can_bo ORDER BY ma_cb ASC", engine)
+                    # Lấy dữ liệu an toàn không dùng ORDER BY ma_cb tránh lỗi cột không tồn tại
+                    df = pd.read_sql("SELECT * FROM can_bo", engine)
                     if df.empty:
                         st.info("Chưa có dữ liệu nhân sự trong CSDL Neon.")
                     else:
