@@ -87,7 +87,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON & TỰ ĐỘNG CẬP NHẬT CỘT LỖI
+# 2. KẾT NỐI DATABASE NEON
 # ---------------------------------------------------------
 def get_db_engine():
     try:
@@ -104,7 +104,6 @@ def get_db_engine():
             return None
 
         with eng.connect() as conn:
-            # Tạo bảng nếu chưa có
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS can_bo (
                     id SERIAL PRIMARY KEY,
@@ -119,7 +118,6 @@ def get_db_engine():
             """))
             conn.commit()
 
-            # Tự động nâng cấp cột nếu bảng cũ bị thiếu cột ma_cb hoặc các cột khác
             columns_to_check = [
                 ("ma_cb", "VARCHAR(50)"),
                 ("ho_ten", "VARCHAR(255)"),
@@ -130,9 +128,7 @@ def get_db_engine():
                 ("email", "VARCHAR(100)")
             ]
             for col_name, col_type in columns_to_check:
-                conn.execute(text(f"""
-                    ALTER TABLE can_bo ADD COLUMN IF NOT EXISTS {col_name} {col_type};
-                """))
+                conn.execute(text(f"ALTER TABLE can_bo ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
             conn.commit()
 
         return eng
@@ -142,7 +138,6 @@ def get_db_engine():
 
 engine = get_db_engine()
 
-# Hàm truy vấn đọc trực tiếp từ DB
 def load_data_from_db():
     if not engine:
         return pd.DataFrame()
@@ -226,7 +221,7 @@ def render_dashboard_home():
     st.markdown("<br>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("<div class='card-box card-red'><div class='card-title'>👨‍⚕️ HỒ SƠ CÁN BỘ CNV</div><div class='card-desc'>Theo dõi, cập nhật và quản lý toàn bộ danh sách hồ sơ 877 nhân sự toàn bệnh viện.</div><div class='card-link'>XEM CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
+        st.markdown("<div class='card-box card-red'><div class='card-title'>👨‍⚕️ HỒ SƠ CÁN BỘ CNV</div><div class='card-desc'>Theo dõi, cập nhật và quản lý toàn bộ danh sách hồ sơ nhân sự toàn bệnh viện.</div><div class='card-link'>XEM CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
         st.markdown("<div class='card-box card-dark'><div class='card-title'>📜 HỢP ĐỒNG LAO ĐỘNG</div><div class='card-desc'>Theo dõi hợp đồng xác định thời hạn, không xác định thời hạn và lịch sử ký.</div><div class='card-link'>QUẢN LÝ HỒ SƠ ➔</div></div>", unsafe_allow_html=True)
 
     with col2:
@@ -303,7 +298,6 @@ def render_quan_ly_can_bo():
                 with engine.connect() as conn:
                     conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
                     conn.commit()
-                st.cache_data.clear()
                 st.success(f"Đã xóa thành công nhân sự [{selected_del}]!")
                 st.rerun()
 
@@ -335,7 +329,6 @@ def render_quan_ly_can_bo():
                                     VALUES (:m, :h, :c, :k, :t, :s, :e)
                                 """), {"m": ma_cb.strip(), "h": ho_ten.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email})
                                 conn.commit()
-                            st.cache_data.clear()
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
                             st.rerun()
                         except Exception as ex:
@@ -381,19 +374,18 @@ def render_quan_ly_can_bo():
                                     WHERE id = :id
                                 """), {"m": ma_cb.strip(), "h": ho_ten.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email, "id": edit_id})
                                 conn.commit()
-                            st.cache_data.clear()
                             st.success("Đã cập nhật thông tin thành công!")
                             st.rerun()
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ CẢI TIẾN THÔNG MINH)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
         with col_m1:
             st.markdown("##### 📥 **1. Tải về file Excel mẫu**")
-            st.caption("Hãy dùng file mẫu này để đảm bảo đúng định dạng cấu trúc.")
+            st.caption("Hãy dùng file mẫu này để chuẩn hóa 100% dữ liệu.")
             
             sample_df = pd.DataFrame({
                 'Mã Cán bộ': ['CB001', 'CB002'],
@@ -423,61 +415,69 @@ def render_quan_ly_can_bo():
             
             if uploaded_file is not None:
                 try:
-                    df_up = pd.read_excel(uploaded_file, engine='openpyxl')
-                    df_up.columns = [str(c).strip() for c in df_up.columns]
-                    
-                    st.markdown("**Xem trước dữ liệu từ file:**")
+                    df_up = pd.read_excel(uploaded_file)
+                    st.markdown("**Xem trước dữ liệu nhận diện:**")
                     st.dataframe(df_up.head(5), use_container_width=True)
                     
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
-                        count_success = 0
-                        
-                        col_map = {str(c).lower().strip(): c for c in df_up.columns}
-                        
-                        col_macb = col_map.get('mã cán bộ') or col_map.get('ma_cb') or col_map.get('mã cb') or df_up.columns[0]
-                        col_hoten = col_map.get('họ và tên') or col_map.get('ho_ten') or col_map.get('họ tên') or df_up.columns[1]
-                        col_chucdanh = col_map.get('chức danh') or col_map.get('chuc_danh')
-                        col_khoaphong = col_map.get('khoa / phòng') or col_map.get('khoa/phòng') or col_map.get('khoa_phong')
-                        col_trinhdo = col_map.get('trình độ') or col_map.get('trinh_do')
-                        col_sdt = col_map.get('số điện thoại') or col_map.get('so_dien_thoai') or col_map.get('sdt')
-                        col_email = col_map.get('email')
+                        # Tự động tìm kiếm tên cột tương ứng bất kể cách đặt tên
+                        def find_col(possible_names, df_cols):
+                            for col in df_cols:
+                                c_clean = str(col).lower().replace(" ", "").replace("_", "").replace("/", "")
+                                for p in possible_names:
+                                    p_clean = p.lower().replace(" ", "").replace("_", "").replace("/", "")
+                                    if p_clean in c_clean:
+                                        return col
+                            return None
 
+                        col_macb = find_col(['macanbo', 'macb', 'manhanvien', 'manv', 'stt', 'id'], df_up.columns)
+                        col_hoten = find_col(['hovaten', 'hoten', 'tencanbo', 'tennhanvien', 'fullname', 'ten'], df_up.columns)
+                        col_chucdanh = find_col(['chucdanh', 'chucvu', 'vitri'], df_up.columns)
+                        col_khoaphong = find_col(['khoaphong', 'khoa', 'phong', 'phongban', 'donvi'], df_up.columns)
+                        col_trinhdo = find_col(['trinhdo', 'bangcap', 'hocluc'], df_up.columns)
+                        col_sdt = find_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone'], df_up.columns)
+                        col_email = find_col(['email', 'thu-dien-tu', 'mail'], df_up.columns)
+
+                        # Nếu không nhận diện được cột Tên, tự động lấy 2 cột đầu tiên
+                        if not col_hoten and len(df_up.columns) >= 2:
+                            col_macb = df_up.columns[0]
+                            col_hoten = df_up.columns[1]
+
+                        count_success = 0
                         with engine.connect() as conn:
                             for idx, row in df_up.iterrows():
-                                m = str(row[col_macb]).strip() if pd.notna(row[col_macb]) else ''
-                                h = str(row[col_hoten]).strip() if pd.notna(row[col_hoten]) else ''
+                                # Lấy giá trị từng dòng
+                                m = str(row[col_macb]).strip() if col_macb and pd.notna(row[col_macb]) else f"CB{idx+1:03d}"
+                                h = str(row[col_hoten]).strip() if col_hoten and pd.notna(row[col_hoten]) else ''
                                 c = str(row[col_chucdanh]).strip() if col_chucdanh and pd.notna(row[col_chucdanh]) else ''
                                 k = str(row[col_khoaphong]).strip() if col_khoaphong and pd.notna(row[col_khoaphong]) else ''
                                 t = str(row[col_trinhdo]).strip() if col_trinhdo and pd.notna(row[col_trinhdo]) else ''
                                 s = str(row[col_sdt]).strip() if col_sdt and pd.notna(row[col_sdt]) else ''
                                 e = str(row[col_email]).strip() if col_email and pd.notna(row[col_email]) else ''
-                                
-                                if m and h and m.lower() != 'nan' and h.lower() != 'nan':
+
+                                if h and h.lower() != 'nan':
                                     try:
                                         conn.execute(text("""
                                             INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                             VALUES (:m, :h, :c, :k, :t, :s, :e)
+                                            ON CONFLICT (ma_cb) DO UPDATE SET
+                                                ho_ten = EXCLUDED.ho_ten,
+                                                chuc_danh = EXCLUDED.chuc_danh,
+                                                khoa_phong = EXCLUDED.khoa_phong,
+                                                trinh_do = EXCLUDED.trinh_do,
+                                                so_dien_thoai = EXCLUDED.so_dien_thoai,
+                                                email = EXCLUDED.email;
                                         """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
                                         count_success += 1
                                     except Exception as ex_item:
-                                        # Nếu trùng mã cán bộ thì tiến hành update
-                                        try:
-                                            conn.execute(text("""
-                                                UPDATE can_bo 
-                                                SET ho_ten = :h, chuc_danh = :c, khoa_phong = :k, trinh_do = :t, so_dien_thoai = :s, email = :e
-                                                WHERE ma_cb = :m
-                                            """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
-                                            count_success += 1
-                                        except Exception:
-                                            pass
+                                        pass
                             conn.commit()
                             
                         if count_success > 0:
-                            st.cache_data.clear()
-                            st.success(f"🎉 Đã nhập và đồng bộ thành công {count_success} nhân sự!")
+                            st.success(f"🎉 Đã nhập thành công {count_success} nhân sự vào hệ thống!")
                             st.rerun()
                         else:
-                            st.error("❌ Không tìm thấy dòng dữ liệu hợp lệ trong file Excel để lưu. Vui lòng kiểm tra lại file mẫu!")
+                            st.error("❌ Không tìm thấy thông tin Họ và Tên hợp lệ trong file Excel. Vui lòng kiểm tra lại file hoặc sử dụng File Mẫu của hệ thống!")
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
 
