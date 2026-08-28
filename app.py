@@ -290,7 +290,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
 
-    # TAB 1: DANH SÁCH & XÓA CÁ NHÂN
+    # TAB 1: DANH SÁCH & XÓA CÁ NHÂN (BỔ SUNG NÚT HỦY THAO TÁC XÓA)
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -318,9 +318,9 @@ def render_quan_ly_can_bo():
             
             st.markdown("---")
             st.markdown("##### 🗑️ **Xóa dữ liệu cá nhân**")
-            col_del1, col_del2 = st.columns([3, 1])
+            col_del1, col_del2, col_del3 = st.columns([2.5, 1, 1])
             
-            options_del = {"-- Chọn nhân sự để xóa (Hoặc hủy chọn) --": None}
+            options_del = {"-- Chọn nhân sự để xóa --": None}
             for _, row in df.iterrows():
                 label = f"{row['ma_can_bo']} - {row['ho_ten']} ({row['khoa_phong'] or 'Chưa phân khoa'})"
                 options_del[label] = row['id']
@@ -338,6 +338,10 @@ def render_quan_ly_can_bo():
                     st.cache_data.clear()
                     st.success(f"Đã xóa thành công [{selected_del_label}]!")
                     st.rerun()
+
+            if col_del3.button("❌ Hủy thao tác", use_container_width=True):
+                st.toast("Đã hủy yêu cầu xóa nhân sự.")
+                st.rerun()
 
     # TAB 2: THÊM & SỬA
     with tab2:
@@ -433,7 +437,7 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ LOẠI BỎ FORM, BỔ SUNG ÁNH XẠ CỘT TRỰC QUAN)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ SỬA CƠ CHẾ ÁNH XẠ CHÍNH XÁC CHO TỪNG CỘT)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -475,15 +479,13 @@ def render_quan_ly_can_bo():
                     st.markdown(f"**Xem trước dữ liệu (Tổng số dòng: {len(df_up)}):**")
                     st.dataframe(df_up.head(5), use_container_width=True)
                     
-                    # Mapping cột trực quan thông minh hơn
                     columns_in_file = df_up.columns.tolist()
                     
                     st.markdown("---")
                     st.markdown("##### 🔗 **Khớp nối cột dữ liệu từ file của bạn:**")
                     col_map1, col_map2 = st.columns(2)
                     
-                    # Tự động đoán tên cột gần đúng nhất
-                    def guess_index(keywords):
+                    def find_col_index(keywords):
                         for idx, col in enumerate(columns_in_file):
                             norm = remove_vietnamese_accent(str(col))
                             for kw in keywords:
@@ -491,15 +493,15 @@ def render_quan_ly_can_bo():
                                     return idx
                         return 0
 
-                    c_macb_sel = col_map1.selectbox("Cột chứa Mã cán bộ", columns_in_file, index=guess_index(['macanbo', 'mcb', 'manv', 'macan']))
-                    c_hoten_sel = col_map2.selectbox("Cột chứa Họ và Tên (*)", columns_in_file, index=guess_index(['hoten', 'hovaten', 'ten', 'fullname']))
-                    c_ns_sel = col_map1.selectbox("Cột chứa Ngày sinh", columns_in_file, index=guess_index(['ngaysinh', 'ns', 'dob']))
-                    c_cccd_sel = col_map2.selectbox("Cột chứa Số CCCD", columns_in_file, index=guess_index(['cccd', 'cmnd', 'socmnd']))
-                    c_cd_sel = col_map1.selectbox("Cột chứa Chức danh", columns_in_file, index=guess_index(['chucdanh', 'chucvu', 'vitri']))
-                    c_kp_sel = col_map2.selectbox("Cột chứa Khoa / Phòng", columns_in_file, index=guess_index(['khoaphong', 'khoa', 'phong']))
-                    c_td_sel = col_map1.selectbox("Cột chứa Trình độ", columns_in_file, index=guess_index(['trinhdo', 'bangcap']))
-                    c_sdt_sel = col_map2.selectbox("Cột chứa Số điện thoại", columns_in_file, index=guess_index(['sdt', 'dienthoai', 'phone']))
-                    c_email_sel = col_map1.selectbox("Cột chứa Email", columns_in_file, index=guess_index(['email', 'mail']))
+                    c_macb_sel = col_map1.selectbox("Cột chứa Mã cán bộ", columns_in_file, index=find_col_index(['macanbo', 'mcb', 'manv', 'macan']))
+                    c_hoten_sel = col_map2.selectbox("Cột chứa Họ và Tên (*)", columns_in_file, index=find_col_index(['hoten', 'hovaten', 'ten', 'fullname']))
+                    c_ns_sel = col_map1.selectbox("Cột chứa Ngày sinh", columns_in_file, index=find_col_index(['ngaysinh', 'ns', 'dob']))
+                    c_cccd_sel = col_map2.selectbox("Cột chứa Số CCCD", columns_in_file, index=find_col_index(['cccd', 'cmnd', 'socmnd']))
+                    c_cd_sel = col_map1.selectbox("Cột chứa Chức danh", columns_in_file, index=find_col_index(['chucdanh', 'chucvu', 'vitri']))
+                    c_kp_sel = col_map2.selectbox("Cột chứa Khoa / Phòng", columns_in_file, index=find_col_index(['khoaphong', 'khoa', 'phong']))
+                    c_td_sel = col_map1.selectbox("Cột chứa Trình độ", columns_in_file, index=find_col_index(['trinhdo', 'bangcap']))
+                    c_sdt_sel = col_map2.selectbox("Cột chứa Số điện thoại", columns_in_file, index=find_col_index(['sdt', 'dienthoai', 'phone']))
+                    c_email_sel = col_map1.selectbox("Cột chứa Email", columns_in_file, index=find_col_index(['email', 'mail']))
 
                     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -518,7 +520,6 @@ def render_quan_ly_can_bo():
                                     if m_val.endswith('.0'): 
                                         m_val = m_val[:-2]
 
-                                    # Xử lý ngày sinh an toàn tuyệt đối
                                     raw_ns = row[c_ns_sel] if c_ns_sel else None
                                     ns_val = None
                                     if pd.notna(raw_ns):
