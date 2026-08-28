@@ -322,7 +322,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
     
-   # TAB 1: DANH SÁCH & XÓA (ĐÃ CHUẨN HÓA ĐỊNH DẠNG NGÀY THÁNG DD/MM/YYYY)
+   # TAB 1: DANH SÁCH & XÓA (CẬP NHẬT TÍNH NĂNG HỦY THAO TÁC XÓA)
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -369,7 +369,6 @@ def render_quan_ly_can_bo():
             df_sorted['priority'] = df_sorted['khoa_phong'].apply(get_department_priority)
             df_sorted = df_sorted.sort_values(by=['priority', 'khoa_phong', 'ho_ten'], ascending=[True, True, True])
             
-            # CHUẨN HÓA HIỂN THỊ CỘT NGÀY SINH THÀNH ĐỊNH DẠNG DD/MM/YYYY
             display_df = df_sorted.drop(columns=['id', 'priority']).copy()
             
             if 'ngay_sinh' in display_df.columns:
@@ -407,7 +406,9 @@ def render_quan_ly_can_bo():
                     st.rerun()
                     
             if col_del3.button("❌ Hủy thao tác", use_container_width=True):
-                st.toast("Đã hủy yêu cầu xóa nhân sự.")
+                # Reset lại giá trị của selectbox về dòng mặc định để ẩn tên nhân sự đi
+                st.session_state["select_del"] = "-- Chọn nhân sự để xóa --"
+                st.toast("Đã hủy thao tác chọn nhân sự.")
                 st.rerun()
 
     # TAB 2: THÊM & SỬA
