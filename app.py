@@ -157,6 +157,9 @@ engine = get_db_engine()
 # ---------------------------------------------------------
 # 3. TRANG ĐĂNG NHẬP CHUẨN MẪU THIẾT KẾ GỐC
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+# 3. TRANG ĐĂNG NHẬP CHUẨN MẪU THIẾT KẾ GỐC
+# ---------------------------------------------------------
 def render_login():
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -164,14 +167,15 @@ def render_login():
     col_l, col_center, col_r = st.columns([1, 1.6, 1])
 
     with col_center:
-        # 1. Logo Bệnh viện Bưu điện tròn ở chính giữa
-        # Logo VNPT Bệnh viện Bưu điện dạng mã hóa trực tiếp
-logo_svg = """
-<div style="text-align: center; margin-bottom: 10px;">
-    <img src="https://raw.githubusercontent.com/streamlit/streamlit/main/docs/static/logo.png" style="width: 110px; display: block; margin: 0 auto;" />
-</div>
-"""
-st.markdown(logo_svg, unsafe_allow_html=True)
+        # 1. Logo Bệnh viện Bưu điện VNPT ở chính giữa
+        st.markdown(
+            """
+            <div style="text-align: center; margin-bottom: 10px;">
+                <img src="https://benhvienbuudien.vn/wp-content/uploads/2021/04/logo-benh-vien-buu-dien.png" style="width: 110px; height: auto;" />
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
 
         # 2. Tiêu đề & Phụ đề
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
