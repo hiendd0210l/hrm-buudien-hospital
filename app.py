@@ -91,7 +91,7 @@ if 'db_initialized' not in st.session_state:
     st.session_state['db_initialized'] = False
 
 # ---------------------------------------------------------
-# 2. HÀM CHUẨN HÓA TIẾNG VIỆT & TRUY VẤN DATABASE
+# 2. HÀM CHUẨN HÓA TIẾNG VIỆT & DATABASE NEON
 # ---------------------------------------------------------
 def remove_vietnamese_accent(text_str):
     if not isinstance(text_str, str):
@@ -145,7 +145,7 @@ def init_db_structure():
 
 init_db_structure()
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=2)
 def load_data_from_db():
     if not engine:
         return pd.DataFrame()
@@ -267,7 +267,7 @@ def render_dashboard_home():
         st.plotly_chart(fig_donut, use_container_width=True)
 
 # ---------------------------------------------------------
-# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (SỬA LỖI TẢI LẠI, NÚT HỦY & EXCEL)
+# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV
 # ---------------------------------------------------------
 def render_quan_ly_can_bo():
     st.markdown("---")
@@ -292,24 +292,27 @@ def render_quan_ly_can_bo():
 
     # TAB 1: DANH SÁCH & XÓA CÁ NHÂN
     with tab1:
-        col_t1, col_t2, col_t3 = st.columns([3, 1, 1])
+        col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
         
         if col_t2.button("🔄 Tải lại dữ liệu", use_container_width=True):
             st.cache_data.clear()
-            st.toast("🔄 Đã cập nhật lại dữ liệu mới nhất từ CSDL!")
+            st.toast("🔄 Đã làm mới dữ liệu!")
             st.rerun()
 
-        if col_t3.button("🧹 Xóa hết dữ liệu lỗi", use_container_width=True, help="Xóa toàn bộ bản ghi để làm sạch CSDL"):
-            with engine.connect() as conn:
-                conn.execute(text("TRUNCATE TABLE can_bo RESTART IDENTITY;"))
-                conn.commit()
-            st.cache_data.clear()
-            st.success("Đã làm sạch toàn bộ dữ liệu CSDL. Hãy Upload lại file Excel mẫu!")
-            st.rerun()
+        if col_t3.button("🧹 Xóa hết dữ liệu lỗi", use_container_width=True):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("DELETE FROM can_bo;"))
+                    conn.commit()
+                st.cache_data.clear()
+                st.success("Đã làm sạch toàn bộ CSDL! Hãy sang Tab 'Nhập Excel' để Upload lại file mẫu mới.")
+                st.rerun()
+            except Exception as e_clean:
+                st.error(f"Lỗi khi làm sạch CSDL: {e_clean}")
 
         if df.empty:
-            st.info("Chưa có dữ liệu nhân sự trong cơ sở dữ liệu. Bạn có thể thêm mới hoặc nhập từ file Excel.")
+            st.info("Chưa có dữ liệu nhân sự trong CSDL. Bạn có thể thêm mới hoặc nhập từ file Excel.")
         else:
             st.dataframe(df, use_container_width=True)
             
@@ -317,8 +320,7 @@ def render_quan_ly_can_bo():
             st.markdown("##### 🗑️ **Xóa dữ liệu cá nhân**")
             col_del1, col_del2 = st.columns([3, 1])
             
-            # Thêm tùy chọn mặc định để HỦY CHỌN / BỎ CHỌN
-            options_del = {"-- Chọn nhân sự để xóa (Hoặc bỏ chọn) --": None}
+            options_del = {"-- Chọn nhân sự để xóa (Hoặc hủy chọn) --": None}
             for _, row in df.iterrows():
                 label = f"{row['ma_can_bo']} - {row['ho_ten']} ({row['khoa_phong'] or 'Chưa phân khoa'})"
                 options_del[label] = row['id']
@@ -328,13 +330,13 @@ def render_quan_ly_can_bo():
 
             if col_del2.button("🗑️ Xóa nhân sự", use_container_width=True):
                 if target_id is None:
-                    st.warning("⚠️ Bạn chưa chọn nhân sự nào để xóa!")
+                    st.warning("⚠️ Bạn chưa chọn nhân sự nào!")
                 else:
                     with engine.connect() as conn:
                         conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
                         conn.commit()
                     st.cache_data.clear()
-                    st.success(f"Đã xóa thành công nhân sự [{selected_del_label}]!")
+                    st.success(f"Đã xóa thành công [{selected_del_label}]!")
                     st.rerun()
 
     # TAB 2: THÊM & SỬA
@@ -431,13 +433,13 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ CẢI TIẾN ĐỌC CHUẨN TẤT CẢ TIÊU ĐỀ EXCEL)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ CẢI TIẾN TOÀN DIỆN MAPPING ĐỌC EXCEL)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
         with col_m1:
             st.markdown("##### 📥 **1. Tải về file Excel mẫu chuẩn**")
-            st.caption("Hãy tải file mẫu này để nhập dữ liệu chính xác 100%.")
+            st.caption("Hãy tải file mẫu chuẩn này để nhập dữ liệu chính xác nhất.")
             
             sample_df = pd.DataFrame({
                 'ID': [1, 2],
@@ -471,7 +473,7 @@ def render_quan_ly_can_bo():
             if uploaded_file is not None:
                 try:
                     df_up = pd.read_excel(uploaded_file, dtype=str)
-                    st.markdown("**Xem trước dữ liệu nhận diện từ File Excel:**")
+                    st.markdown("**Xem trước dữ liệu đọc từ Excel:**")
                     st.dataframe(df_up.head(5), use_container_width=True)
                     
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
@@ -489,10 +491,10 @@ def render_quan_ly_can_bo():
                         c_hoten = get_col(['hovaten', 'hoten', 'tencanbo', 'tennhanvien', 'fullname', 'ten'])
                         c_ngaysinh = get_col(['ngaysinh', 'ns', 'dob', 'dateofbirth'])
                         c_cccd = get_col(['socccd', 'cccd', 'cmnd', 'socmnd'])
-                        c_chucdanh = get_col(['chucdanh', 'chucvu', 'vitri'])
+                        c_chucdanh = get_col(['chucdanh', 'chucvu', 'vitri', 'cd'])
                         c_khoaphong = get_col(['khoaphong', 'khoa', 'phong', 'donvi'])
-                        c_trinhdo = get_col(['trinhdo', 'bangcap', 'hocluc'])
-                        c_sdt = get_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone'])
+                        c_trinhdo = get_col(['trinhdo', 'bangcap', 'hocluc', 'td'])
+                        c_sdt = get_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone', 'mobile'])
                         c_email = get_col(['email', 'mail'])
 
                         if not c_hoten and len(cols) >= 2:
@@ -531,19 +533,11 @@ def render_quan_ly_can_bo():
                                 e_val = clean_str(row[c_email]) if c_email else None
 
                                 if h:
-                                    check_res = conn.execute(text("SELECT id FROM can_bo WHERE ma_can_bo = :m"), {"m": m}).fetchone()
-                                    if check_res:
-                                        conn.execute(text("""
-                                            UPDATE can_bo SET 
-                                                ho_ten = :h, ngay_sinh = :ns, so_cccd = :cccd, chuc_danh = :c, 
-                                                khoa_phong = :k, trinh_do = :t, so_dien_thoai = :s, email = :e
-                                            WHERE ma_can_bo = :m
-                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c_val, "k": k_val, "t": t_val, "s": s_val, "e": e_val})
-                                    else:
-                                        conn.execute(text("""
-                                            INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
-                                            VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
-                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c_val, "k": k_val, "t": t_val, "s": s_val, "e": e_val})
+                                    # Tiến hành chèn dữ liệu mới hoàn toàn
+                                    conn.execute(text("""
+                                        INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                        VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
+                                    """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c_val, "k": k_val, "t": t_val, "s": s_val, "e": e_val})
                                     count_inserted += 1
                             
                             conn.commit()
