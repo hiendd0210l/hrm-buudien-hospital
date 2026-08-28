@@ -164,7 +164,7 @@ def get_db_engine():
         else:
             return None
 
-        # Tự động tạo bảng nếu chưa có với đầy đủ các thuộc tính nhân sự
+        # Tự động tạo bảng nếu chưa có
         with eng.connect() as conn:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS can_bo (
@@ -187,7 +187,7 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (ENTER & ESC)
+# 3. TRANG ĐĂNG NHẬP
 # ---------------------------------------------------------
 def render_login():
     st.markdown("<br>", unsafe_allow_html=True)
@@ -251,7 +251,7 @@ def render_login():
     """, height=0)
 
 # ---------------------------------------------------------
-# 4. TRANG CHỦ & DASHBOARD
+# 4. DASHBOARD TRANG CHỦ
 # ---------------------------------------------------------
 def render_dashboard_home():
     st.markdown("<br>", unsafe_allow_html=True)
@@ -295,7 +295,7 @@ def render_dashboard_home():
         st.plotly_chart(fig_donut, use_container_width=True)
 
 # ---------------------------------------------------------
-# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (THÊM, SỬA, XÓA, EXCEL)
+# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (DÙNG OPENPYXL DỄ DÙNG VÀ AN TOÀN)
 # ---------------------------------------------------------
 def render_quan_ly_can_bo():
     st.markdown("---")
@@ -305,10 +305,10 @@ def render_quan_ly_can_bo():
         st.error("Chưa kết nối được Cơ sở dữ liệu Neon. Vui lòng kiểm tra lại cấu hình Secrets.")
         return
 
-    # Lấy dữ liệu mới nhất
+    # Lấy dữ liệu
     try:
         df = pd.read_sql("SELECT id, ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email FROM can_bo ORDER BY id DESC", engine)
-    except Exception as e:
+    except Exception:
         df = pd.DataFrame()
 
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -318,7 +318,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
 
-    # TAB 1: DANH SÁCH VÀ XÓA CÁ NHÂN
+    # TAB 1: DANH SÁCH & XÓA CÁ NHÂN
     with tab1:
         st.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
         if df.empty:
@@ -330,7 +330,6 @@ def render_quan_ly_can_bo():
             st.markdown("##### 🗑️ **Xóa dữ liệu cá nhân**")
             col_del1, col_del2 = st.columns([3, 1])
             
-            # Chọn cán bộ cần xóa
             options_del = {f"{row['ma_cb']} - {row['ho_ten']} ({row['khoa_phong']})": row['id'] for _, row in df.iterrows()}
             selected_del = col_del1.selectbox("Chọn nhân sự muốn xóa:", list(options_del.keys()), key="select_del")
             
@@ -342,7 +341,7 @@ def render_quan_ly_can_bo():
                 st.success(f"Đã xóa thành công nhân sự [{selected_del}]!")
                 st.rerun()
 
-    # TAB 2: THÊM MỚI VÀ SỬA TỪNG CÁ NHÂN
+    # TAB 2: THÊM & SỬA
     with tab2:
         action_mode = st.radio("Chọn thao tác:", ["➕ Thêm Nhân sự Mới", "✏️ Chỉnh sửa thông tin Cán bộ"], horizontal=True)
         
@@ -372,10 +371,10 @@ def render_quan_ly_can_bo():
                                 conn.commit()
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
                             st.rerun()
-                        except Exception as ex:
-                            st.error(f"Lỗi: Mã Cán bộ [{ma_cb}] đã tồn tại hoặc dữ liệu chưa hợp lệ!")
+                        except Exception:
+                            st.error(f"Lỗi: Mã Cán bộ [{ma_cb}] đã tồn tại hoặc dữ liệu không hợp lệ!")
 
-        else: # SỬA THÔNG TIN CÁ NHÂN
+        else:
             if df.empty:
                 st.info("Chưa có dữ liệu để chỉnh sửa.")
             else:
@@ -420,15 +419,14 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI FILE EXCEL MẪU & UPLOAD NHẬP DỮ LIỆU
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
         with col_m1:
             st.markdown("##### 📥 **1. Tải về file Excel mẫu**")
-            st.caption("Mẫu chuẩn bao gồm đầy đủ tiêu đề cột để nhập liệu.")
+            st.caption("Mẫu chuẩn chứa tiêu đề chuẩn để nhập dữ liệu hàng loạt.")
             
-            # Tạo DataFrame Mẫu
             sample_df = pd.DataFrame({
                 'Mã Cán bộ': ['CB001', 'CB002'],
                 'Họ và Tên': ['Nguyễn Văn A', 'Trần Thị B'],
@@ -440,7 +438,8 @@ def render_quan_ly_can_bo():
             })
             
             output_sample = io.BytesIO()
-            with pd.ExcelWriter(output_sample, engine='xlsxwriter') as writer:
+            # Dùng engine openpyxl để xuất Excel an toàn
+            with pd.ExcelWriter(output_sample, engine='openpyxl') as writer:
                 sample_df.to_excel(writer, index=False, sheet_name='Mau_Nhan_Su')
             
             st.download_button(
@@ -453,18 +452,16 @@ def render_quan_ly_can_bo():
 
         with col_m2:
             st.markdown("##### 📤 **2. Tải lên file Excel để nhập dữ liệu**")
-            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx hoặc .xls) để upload:", type=['xlsx', 'xls'])
+            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx) để upload:", type=['xlsx', 'xls'])
             
             if uploaded_file is not None:
                 try:
-                    df_up = pd.read_excel(uploaded_file)
-                    st.markdown("**Xem trước dữ liệu từ file Excel:**")
+                    df_up = pd.read_excel(uploaded_file, engine='openpyxl')
+                    st.markdown("**Xem trước dữ liệu từ file:**")
                     st.dataframe(df_up.head(5), use_container_width=True)
                     
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
                         count_success = 0
-                        count_fail = 0
-                        
                         with engine.connect() as conn:
                             for idx, row in df_up.iterrows():
                                 m = str(row.get('Mã Cán bộ', '')).strip()
@@ -487,15 +484,15 @@ def render_quan_ly_can_bo():
                                         """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
                                         count_success += 1
                                     except Exception:
-                                        count_fail += 1
+                                        pass
                             conn.commit()
                             
-                        st.success(f"Cập nhật thành công {count_success} bản ghi vào hệ thống!")
+                        st.success(f"Đã xử lý và cập nhật thành công {count_success} bản ghi vào CSDL!")
                         st.rerun()
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
 
-    # TAB 4: XUẤT DỮ LIỆU EXCEL
+    # TAB 4: XUẤT EXCEL
     with tab4:
         st.markdown("##### 📊 **Tải toàn bộ dữ liệu Cán bộ CNV ra file Excel**")
         if df.empty:
@@ -505,7 +502,7 @@ def render_quan_ly_can_bo():
             export_df.columns = ['Mã Cán bộ', 'Họ và Tên', 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email']
             
             output_exp = io.BytesIO()
-            with pd.ExcelWriter(output_exp, engine='xlsxwriter') as writer:
+            with pd.ExcelWriter(output_exp, engine='openpyxl') as writer:
                 export_df.to_excel(writer, index=False, sheet_name='Nhan_Su_BV_Buu_Dien')
             
             st.download_button(
@@ -567,7 +564,7 @@ def render_dashboard():
         st.info(f"⚙️ Chức năng **{menu}** đang được đồng bộ dữ liệu.")
 
 # ---------------------------------------------------------
-# 7. CHẠY ỨNG DỤNG
+# 7. CHẠY APP
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     render_login()
