@@ -8,7 +8,7 @@ import plotly.express as px
 from sqlalchemy import create_engine, text
 
 # ---------------------------------------------------------
-# 1. CẤU HÌNH TRANG & CSS GIAO DIỆN CHUẨN
+# 1. CẤU HÌNH TRANG & CSS GIAO DIỆN
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="BỆNH VIỆN BƯU ĐIỆN - Hệ thống Quản trị Nhân sự & Điều hành",
@@ -17,15 +17,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS TỐI ƯU GIAO DIỆN & KHUNG BO TRÒN CONTAINER/FORM
 st.markdown("""
 <style>
-    /* Nền tổng thể trang */
-    .stApp {
-        background-color: #f1f5f9 !important;
-    }
-
-    /* ĐỊNH DẠNG KHUNG CONTAINER BO TRÒN */
+    .stApp { background-color: #f1f5f9 !important; }
     [data-testid="stVerticalBlockBorderWrapper"], form[key="login_form"] {
         background-color: #ffffff !important;
         border-radius: 16px !important;
@@ -33,76 +27,36 @@ st.markdown("""
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03) !important;
         padding: 30px 25px 25px 25px !important;
     }
-
-    /* TIÊU ĐỀ TRANG TO NỔI BẬT */
     .hospital-title {
-        color: #0066b2 !important;
-        font-weight: 800 !important;
-        font-size: 30px !important;
-        text-align: center;
-        margin-top: 15px;
-        margin-bottom: 4px;
-        letter-spacing: 0.5px;
+        color: #0066b2 !important; font-weight: 800 !important;
+        font-size: 30px !important; text-align: center;
+        margin-top: 15px; margin-bottom: 4px; letter-spacing: 0.5px;
     }
-
     .hospital-subtitle {
-        color: #475569 !important;
-        font-size: 16px !important;
-        font-weight: 600 !important;
-        text-align: center;
-        margin-bottom: 25px;
+        color: #475569 !important; font-size: 16px !important;
+        font-weight: 600 !important; text-align: center; margin-bottom: 25px;
     }
-
-    /* Ô NHẬP LIỆU TO VÀ DỄ ĐỌC */
     .stTextInput > label, .stSelectbox > label {
-        color: #0f172a !important;
-        font-size: 15px !important;
-        font-weight: 700 !important;
-        margin-bottom: 4px !important;
+        color: #0f172a !important; font-size: 15px !important;
+        font-weight: 700 !important; margin-bottom: 4px !important;
     }
-
     .stTextInput > div > div > input {
-        border-radius: 8px !important;
-        border: 1.5px solid #cbd5e1 !important;
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-        height: 44px !important;
+        border-radius: 8px !important; border: 1.5px solid #cbd5e1 !important;
+        background-color: #ffffff !important; color: #0f172a !important; height: 44px !important;
     }
-
-    /* CÁC NÚT NHẤN MÀU XANH DƯƠNG CHỮ ĐẬM */
     .stButton > button, div[data-testid="stFormSubmitButton"] > button {
         background: linear-gradient(180deg, #0070d2 0%, #0056a3 100%) !important;
-        color: #ffffff !important;
-        font-weight: 800 !important;
-        font-size: 16px !important;
-        border-radius: 8px !important;
-        border: 1px solid #004080 !important;
-        height: 44px !important;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12) !important;
-        transition: all 0.2s ease !important;
-        width: 100% !important;
+        color: #ffffff !important; font-weight: 800 !important;
+        font-size: 16px !important; border-radius: 8px !important;
+        border: 1px solid #004080 !important; height: 44px !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12) !important; width: 100% !important;
     }
-    
     .stButton > button p, div[data-testid="stFormSubmitButton"] > button p {
-        color: #ffffff !important;
-        font-weight: 800 !important;
-        font-size: 16px !important;
+        color: #ffffff !important; font-weight: 800 !important; font-size: 16px !important;
     }
-
-    .stButton > button:hover, div[data-testid="stFormSubmitButton"] > button:hover {
-        background: linear-gradient(180deg, #0080f0 0%, #0062b8 100%) !important;
-        border-color: #003366 !important;
-        transform: translateY(-1px);
-    }
-
-    /* DASHBOARD CARD STYLES */
     .card-box {
-        padding: 20px;
-        border-radius: 10px;
-        color: white;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        min-height: 130px;
+        padding: 20px; border-radius: 10px; color: white; margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); min-height: 130px;
     }
     .card-red { background: linear-gradient(135deg, #e53935, #d32f2f); }
     .card-green { background: linear-gradient(135deg, #00b074, #008a5b); }
@@ -110,35 +64,21 @@ st.markdown("""
     .card-dark { background: linear-gradient(135deg, #37474f, #263238); }
     .card-orange { background: linear-gradient(135deg, #ff9200, #e67e00); }
     .card-teal { background: linear-gradient(135deg, #00a896, #028090); }
-
     .card-title { font-size: 15px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
     .card-desc { font-size: 12px; opacity: 0.9; margin-bottom: 10px; }
     .card-link { font-size: 11px; font-weight: bold; text-align: right; text-transform: uppercase; }
-
     .badge-circle {
-        background-color: #ffffff;
-        border: 2px solid;
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        float: right;
+        background-color: #ffffff; border: 2px solid; border-radius: 50%;
+        width: 30px; height: 30px; display: inline-flex; align-items: center;
+        justify-content: center; font-weight: bold; float: right;
     }
     .badge-red { border-color: #ff4d4f; color: #ff4d4f; }
     .badge-orange { border-color: #ff9200; color: #ff9200; }
     .badge-blue { border-color: #29b6f6; color: #29b6f6; }
     .badge-green { border-color: #00b074; color: #00b074; }
-
     .alert-item {
-        background-color: #ffffff;
-        padding: 12px 15px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        border-left: 4px solid #00b074;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        background-color: #ffffff; padding: 12px 15px; border-radius: 8px;
+        margin-bottom: 10px; border-left: 4px solid #00b074; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -147,7 +87,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON & TỰ ĐỘNG KHỞI TẠO BẢNG
+# 2. KẾT NỐI DATABASE NEON & TẠO BẢNG CHUẨN
 # ---------------------------------------------------------
 @st.cache_resource
 def get_db_engine():
@@ -164,7 +104,6 @@ def get_db_engine():
         else:
             return None
 
-        # Tự động tạo bảng nếu chưa có
         with eng.connect() as conn:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS can_bo (
@@ -295,7 +234,7 @@ def render_dashboard_home():
         st.plotly_chart(fig_donut, use_container_width=True)
 
 # ---------------------------------------------------------
-# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (DÙNG OPENPYXL DỄ DÙNG VÀ AN TOÀN)
+# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (TỐI ƯU UPLOAD XỬ LÝ LỖI)
 # ---------------------------------------------------------
 def render_quan_ly_can_bo():
     st.markdown("---")
@@ -305,7 +244,7 @@ def render_quan_ly_can_bo():
         st.error("Chưa kết nối được Cơ sở dữ liệu Neon. Vui lòng kiểm tra lại cấu hình Secrets.")
         return
 
-    # Lấy dữ liệu
+    # Lấy dữ liệu hiện tại
     try:
         df = pd.read_sql("SELECT id, ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email FROM can_bo ORDER BY id DESC", engine)
     except Exception:
@@ -367,12 +306,12 @@ def render_quan_ly_can_bo():
                                 conn.execute(text("""
                                     INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                     VALUES (:m, :h, :c, :k, :t, :s, :e)
-                                """), {"m": ma_cb, "h": ho_ten, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email})
+                                """), {"m": ma_cb.strip(), "h": ho_ten.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email})
                                 conn.commit()
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
                             st.rerun()
                         except Exception:
-                            st.error(f"Lỗi: Mã Cán bộ [{ma_cb}] đã tồn tại hoặc dữ liệu không hợp lệ!")
+                            st.error(f"Lỗi: Mã Cán bộ [{ma_cb}] đã tồn tại trong hệ thống!")
 
         else:
             if df.empty:
@@ -412,20 +351,20 @@ def render_quan_ly_can_bo():
                                     SET ma_cb = :m, ho_ten = :h, chuc_danh = :c, khoa_phong = :k, 
                                         trinh_do = :t, so_dien_thoai = :s, email = :e
                                     WHERE id = :id
-                                """), {"m": ma_cb, "h": ho_ten, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email, "id": edit_id})
+                                """), {"m": ma_cb.strip(), "h": ho_ten.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email, "id": edit_id})
                                 conn.commit()
                             st.success("Đã cập nhật thông tin thành công!")
                             st.rerun()
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (XỬ LÝ TOÀN DIỆN LỖI KHÔNG LƯU)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
         with col_m1:
             st.markdown("##### 📥 **1. Tải về file Excel mẫu**")
-            st.caption("Mẫu chuẩn chứa tiêu đề chuẩn để nhập dữ liệu hàng loạt.")
+            st.caption("Hãy dùng file mẫu này để nhập dữ liệu để đảm bảo tên cột chính xác nhất.")
             
             sample_df = pd.DataFrame({
                 'Mã Cán bộ': ['CB001', 'CB002'],
@@ -438,7 +377,6 @@ def render_quan_ly_can_bo():
             })
             
             output_sample = io.BytesIO()
-            # Dùng engine openpyxl để xuất Excel an toàn
             with pd.ExcelWriter(output_sample, engine='openpyxl') as writer:
                 sample_df.to_excel(writer, index=False, sheet_name='Mau_Nhan_Su')
             
@@ -457,38 +395,70 @@ def render_quan_ly_can_bo():
             if uploaded_file is not None:
                 try:
                     df_up = pd.read_excel(uploaded_file, engine='openpyxl')
+                    # Chuẩn hóa tên cột: xóa khoảng trắng dư thừa
+                    df_up.columns = [str(c).strip() for c in df_up.columns]
+                    
                     st.markdown("**Xem trước dữ liệu từ file:**")
                     st.dataframe(df_up.head(5), use_container_width=True)
                     
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
                         count_success = 0
-                        with engine.connect() as conn:
-                            for idx, row in df_up.iterrows():
-                                m = str(row.get('Mã Cán bộ', '')).strip()
-                                h = str(row.get('Họ và Tên', '')).strip()
-                                c = str(row.get('Chức danh', ''))
-                                k = str(row.get('Khoa / Phòng', ''))
-                                t = str(row.get('Trình độ', ''))
-                                s = str(row.get('Số điện thoại', ''))
-                                e = str(row.get('Email', ''))
+                        count_fail = 0
+                        
+                        # Tìm tên cột linh hoạt (không phân biệt hoa/thường)
+                        col_map = {str(c).lower().strip(): c for c in df_up.columns}
+                        
+                        col_macb = col_map.get('mã cán bộ') or col_map.get('ma_cb') or col_map.get('mã cb')
+                        col_hoten = col_map.get('họ và tên') or col_map.get('ho_ten') or col_map.get('họ tên')
+                        col_chucdanh = col_map.get('chức danh') or col_map.get('chuc_danh')
+                        col_khoaphong = col_map.get('khoa / phòng') or col_map.get('khoa/phòng') or col_map.get('khoa_phong')
+                        col_trinhdo = col_map.get('trình độ') or col_map.get('trinh_do')
+                        col_sdt = col_map.get('số điện thoại') or col_map.get('so_dien_thoai') or col_map.get('sdt')
+                        col_email = col_map.get('email')
+
+                        if not col_macb or not col_hoten:
+                            st.error("❌ File Excel thiếu cột 'Mã Cán bộ' hoặc 'Họ và Tên'. Vui lòng dùng file mẫu!")
+                        else:
+                            with engine.connect() as conn:
+                                for idx, row in df_up.iterrows():
+                                    m = str(row[col_macb]).strip() if pd.notna(row[col_macb]) else ''
+                                    h = str(row[col_hoten]).strip() if pd.notna(row[col_hoten]) else ''
+                                    c = str(row[col_chucdanh]).strip() if col_chucdanh and pd.notna(row[col_chucdanh]) else ''
+                                    k = str(row[col_khoaphong]).strip() if col_khoaphong and pd.notna(row[col_khoaphong]) else ''
+                                    t = str(row[col_trinhdo]).strip() if col_trinhdo and pd.notna(row[col_trinhdo]) else ''
+                                    s = str(row[col_sdt]).strip() if col_sdt and pd.notna(row[col_sdt]) else ''
+                                    e = str(row[col_email]).strip() if col_email and pd.notna(row[col_email]) else ''
+                                    
+                                    if m and h and m != 'nan' and h != 'nan':
+                                        try:
+                                            # Kiểm tra xem mã đã tồn tại chưa
+                                            check_res = conn.execute(text("SELECT id FROM can_bo WHERE ma_cb = :m"), {"m": m}).fetchone()
+                                            
+                                            if check_res:
+                                                # Cập nhật thông tin nếu mã đã tồn tại
+                                                conn.execute(text("""
+                                                    UPDATE can_bo 
+                                                    SET ho_ten = :h, chuc_danh = :c, khoa_phong = :k,
+                                                        trinh_do = :t, so_dien_thoai = :s, email = :e
+                                                    WHERE ma_cb = :m
+                                                """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                            else:
+                                                # Thêm mới nếu chưa có
+                                                conn.execute(text("""
+                                                    INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                                    VALUES (:m, :h, :c, :k, :t, :s, :e)
+                                                """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                                
+                                            count_success += 1
+                                        except Exception as err:
+                                            count_fail += 1
+                                conn.commit()
                                 
-                                if m and h and m != 'nan' and h != 'nan':
-                                    try:
-                                        conn.execute(text("""
-                                            INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
-                                            VALUES (:m, :h, :c, :k, :t, :s, :e)
-                                            ON CONFLICT (ma_cb) DO UPDATE 
-                                            SET ho_ten = EXCLUDED.ho_ten, chuc_danh = EXCLUDED.chuc_danh, 
-                                                khoa_phong = EXCLUDED.khoa_phong, trinh_do = EXCLUDED.trinh_do,
-                                                so_dien_thoai = EXCLUDED.so_dien_thoai, email = EXCLUDED.email
-                                        """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
-                                        count_success += 1
-                                    except Exception:
-                                        pass
-                            conn.commit()
-                            
-                        st.success(f"Đã xử lý và cập nhật thành công {count_success} bản ghi vào CSDL!")
-                        st.rerun()
+                            if count_success > 0:
+                                st.success(f"🎉 Đã lưu thành công {count_success} cán bộ vào CSDL!")
+                                st.rerun()
+                            else:
+                                st.warning("⚠️ Không tìm thấy dòng dữ liệu hợp lệ trong file Excel để lưu.")
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
 
@@ -514,7 +484,7 @@ def render_quan_ly_can_bo():
             )
 
 # ---------------------------------------------------------
-# 6. ĐIỀU HƯỚNG DASHBOARD CHÍNH
+# 6. ĐIỀU HƯỚNG MỤC DASHBOARD
 # ---------------------------------------------------------
 def render_dashboard():
     st.sidebar.title("DANH MỤC CHỨC NĂNG")
