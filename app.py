@@ -4,260 +4,311 @@ import plotly.express as px
 from sqlalchemy import create_engine, text
 
 # ---------------------------------------------------------
-# 1. CẤU HÌNH TRANG STREAMLIT
+# 1. CẤU HÌNH TRANG & CSS TÙY CHỈNH (THEO THIẾT KẾ MỚI)
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="HRM Bệnh viện Bưu điện",
+    page_title="DANH MỤC CHỨC NĂNG - BỆNH VIỆN BƯU ĐIỆN",
     page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON POSTGRESQL (DÙNG DATABASE_URL)
-# ---------------------------------------------------------
-import urllib.parse
-from sqlalchemy import create_engine, text
+# Custom CSS tái tạo giao diện thẻ màu & hiệu ứng đẹp mắt
+st.markdown("""
+<style>
+    /* Gradient & khung thẻ màu */
+    .card-box {
+        padding: 20px;
+        border-radius: 10px;
+        color: white;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        position: relative;
+        min-height: 130px;
+    }
+    .card-red { background: linear-gradient(135deg, #e53935, #d32f2f); }
+    .card-green { background: linear-gradient(135deg, #00b074, #008a5b); }
+    .card-blue { background: linear-gradient(135deg, #29b6f6, #0288d1); }
+    .card-dark { background: linear-gradient(135deg, #37474f, #263238); }
+    .card-orange { background: linear-gradient(135deg, #ff9200, #e67e00); }
+    .card-teal { background: linear-gradient(135deg, #00a896, #028090); }
+    
+    .card-title { font-size: 16px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+    .card-desc { font-size: 12px; opacity: 0.9; margin-bottom: 10px; }
+    .card-link { font-size: 11px; font-weight: bold; text-align: right; text-transform: uppercase; cursor: pointer; }
 
+    /* Badge hình tròn ở khung Cảnh báo */
+    .badge-circle {
+        background-color: #ffffff;
+        border: 2px solid;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        float: right;
+    }
+    .badge-red { border-color: #ff4d4f; color: #ff4d4f; }
+    .badge-orange { border-color: #ff9200; color: #ff9200; }
+    .badge-blue { border-color: #29b6f6; color: #29b6f6; }
+    .badge-green { border-color: #00b074; color: #00b074; }
+    
+    .alert-item {
+        background-color: #f8f9fa;
+        padding: 12px 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        border-left: 4px solid #00b074;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# 2. KẾT NỐI DATABASE NEON POSTGRESQL
+# ---------------------------------------------------------
 @st.cache_resource
 def get_db_engine():
     try:
-        if "DATABASE_URL" not in st.secrets:
-            st.warning("⚠️ Chưa cấu hình DATABASE_URL trong Secrets.")
-            return None
-            
-        raw_url = st.secrets["DATABASE_URL"].strip()
-        
-        # Chuyển đổi postgres:// thành postgresql:// nếu có
-        if raw_url.startswith("postgres://"):
-            raw_url = raw_url.replace("postgres://", "postgresql://", 1)
-            
-        engine = create_engine(raw_url, pool_pre_ping=True)
-        return engine
+        if "DATABASE_URL" in st.secrets:
+            raw_url = st.secrets["DATABASE_URL"].strip()
+            if raw_url.startswith("postgres://"):
+                raw_url = raw_url.replace("postgres://", "postgresql://", 1)
+            return create_engine(raw_url, pool_pre_ping=True)
+        elif "postgres" in st.secrets:
+            pg = st.secrets["postgres"]
+            db_url = f"postgresql://{pg['user']}:{pg['password']}@{pg['host']}:{pg['port']}/{pg['database']}?sslmode=require"
+            return create_engine(db_url, pool_pre_ping=True)
+        return None
     except Exception as e:
         st.error(f"Lỗi kết nối CSDL: {e}")
         return None
 
 engine = get_db_engine()
 
-# Khởi tạo bảng dữ liệu cán bộ trên Neon DB nếu chưa tồn tại
-def init_db():
-    if engine:
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS can_bo (
-                        ma_cb VARCHAR(20) PRIMARY KEY,
-                        ho_ten VARCHAR(100) NOT NULL,
-                        chuc_danh VARCHAR(50),
-                        khoa_phong VARCHAR(100),
-                        loai_nhan_su VARCHAR(50),
-                        so_dienthoai VARCHAR(15),
-                        trang_thai VARCHAR(20) DEFAULT 'Đang làm việc'
-                    );
-                """))
-                conn.commit()
-        except Exception as e:
-            st.error(f"Lỗi khởi tạo bảng CSDL: {e}")
-
-init_db()
-
 # ---------------------------------------------------------
-# 3. THANH MENU BÊN TRÁI (SIDEBAR)
+# 3. SIDEBAR - DANH MỤC CHỨC NĂNG (ĐẦY ĐỦ NHƯ THIẾT KẾ)
 # ---------------------------------------------------------
-st.sidebar.title("🏥 HRM BƯU ĐIỆN")
-st.sidebar.caption("Hệ thống Quản trị Nhân sự Y tế 4.0")
+st.sidebar.title("DANH MỤC CHỨC NĂNG")
+st.sidebar.caption("👤 **Xin chào:** Đoàn Danh Hiển")
 
-menu = st.sidebar.radio(
-    "Danh mục quản lý", 
-    ["Dashboard & Cảnh báo", "Hồ sơ Cán bộ", "Báo cáo & Thống kê"]
-)
+# Nút Đăng xuất mẫu
+st.sidebar.button("🔒 Đăng xuất", use_container_width=True)
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **Kết nối:** Dữ liệu thời gian thực đồng bộ với Neon PostgreSQL Database.")
+st.sidebar.caption("Điều hướng chức năng")
+
+# Tất cả 16 danh mục đúng theo giao diện mẫu
+menu = st.sidebar.radio(
+    "",
+    [
+        "📌 Trang chủ / Dashboard",
+        "📑 Thông báo & Văn bản",
+        "👤 Hồ sơ Cán bộ CNV",
+        "🎓 Phân loại Trình độ",
+        "📝 Hợp đồng Lao động",
+        "🏛️ Hồ sơ Đảng viên",
+        "📜 Giấy phép hành nghề (GPHN)",
+        "📚 Theo dõi Đào tạo CME",
+        "📈 Nâng bậc lương & Ngạch",
+        "🔄 Bố trí & Điều chuyển",
+        "🏥 Quản lý BHXH",
+        "🩺 Quản lý BHOI & Sức khỏe",
+        "⏱️ Báo cáo - Thống kê",
+        "📊 Thống kê Tiến độ Đào tạo MS",
+        "⚙️ Cấu hình Hệ thống"
+    ]
+)
 
 # ---------------------------------------------------------
-# TAB 1: DASHBOARD & CẢNH BÁO
+# CỦA SỔ CHÍNH - HEADER NGUỜI DÙNG
 # ---------------------------------------------------------
-if menu == "Dashboard & Cảnh báo":
-    st.title("📊 TỔNG QUAN NHÂN SỰ BỆNH VIỆN BƯU ĐIỆN")
-    
-    # Đếm tổng số cán bộ từ DB thực tế
-    total_cb = 0
-    if engine:
-        try:
-            with engine.connect() as conn:
-                res = conn.execute(text("SELECT COUNT(*) FROM can_bo")).fetchone()
-                total_cb = res[0] if res else 0
-        except:
-            total_cb = 0
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Tổng cán bộ (Đã nhập)", f"{total_cb} Cán bộ", "+12 tháng này")
-    col2.metric("Bác sĩ / Dược sĩ", "450", "30% Tổng số quy hoạch")
-    col3.metric("Cảnh báo nâng lương", "28 Cán bộ", "⚡ Cần xử lý", delta_color="inverse")
-    col4.metric("Sắp đến tuổi nghỉ hưu", "5 Cán bộ", "Trong 6 tháng")
-    
-    st.markdown("---")
-    st.subheader("⚠️ Cảnh báo Hệ thống Tự động (Phụ lục 02)")
-    
-    st.warning("🔔 **Thông báo:** Có 8 cán bộ quá hạn giữ chức vụ bổ nhiệm & 12 cán bộ sắp hết hạn Hợp đồng lao động!")
-    
-    data_canh_bao = {
-        "Mã CB": ["CB001", "CB045", "CB112", "CB090"],
-        "Họ và Tên": ["BS. Nguyễn Văn A", "ThS. Trần Thị B", "CN. Lê Văn C", "BSCKII. Phạm Hoàng D"],
-        "Khoa / Phòng": ["Khoa Cấp Cứu", "Khoa Dược", "Phòng TCKT", "Khoa Ngoại Tổng Hợp"],
-        "Loại Cảnh báo": ["Quá hạn nâng lương", "Sắp hết hạn HĐLĐ", "Sắp nghỉ hưu", "Quá hạn bổ nhiệm"],
-        "Hạn xử lý": ["15/09/2026", "20/09/2026", "01/10/2026", "05/10/2026"]
-    }
-    st.table(pd.DataFrame(data_canh_bao))
+def render_header():
+    col_user_img, col_user_info = st.columns([1, 11])
+    with col_user_img:
+        st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=70)
+    with col_user_info:
+        st.title("Xin chào, Đoàn Danh Hiển")
+        st.caption("Quản trị viên Hệ thống — Bệnh viện Bưu điện")
 
 # ---------------------------------------------------------
-# TAB 2: QUẢN LÝ HỒ SƠ CÁN BỘ
+# MAN HINH 1: TRANG CHỦ / DASHBOARD (CHÍNH THEO THIẾT KẾ)
 # ---------------------------------------------------------
-elif menu == "Hồ sơ Cán bộ":
-    st.title("📁 QUẢN LÝ HỒ SƠ CÁN BỘ Y TẾ")
+if menu == "📌 Trang chủ / Dashboard":
+    render_header()
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    tab_danh_sach, tab_them_moi = st.tabs(["📋 Danh sách Cán bộ", "➕ Thêm Cán bộ Mới"])
+    # --- KHỐI 6 THẺ CHỨC NĂNG CHÍNH (GRID 3x2) ---
+    col1, col2, col3 = st.columns(3)
     
-    # --- 2.1 Xem & Tìm kiếm Cán bộ ---
-    with tab_danh_sach:
-        st.subheader("Danh sách Cán bộ Y tế trong CSDL")
+    with col1:
+        st.markdown("""
+        <div class="card-box card-red">
+            <div class="card-title">👨‍⚕️ HỒ SƠ CÁN BỘ CNV</div>
+            <div class="card-desc">Theo dõi, cập nhật và quản lý toàn bộ danh sách hồ sơ 877 nhân sự toàn bệnh viện.</div>
+            <div class="card-link">XEM CHI TIẾT ➔</div>
+        </div>
+        """, unsafe_allow_html=True)
         
+        st.markdown("""
+        <div class="card-box card-dark">
+            <div class="card-title">📜 HỢP ĐỒNG LAO ĐỘNG</div>
+            <div class="card-desc">Theo dõi hợp đồng xác định thời hạn, không xác định thời hạn và lịch sử ký.</div>
+            <div class="card-link">QUẢN LÝ HỒ SƠ ➔</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("""
+        <div class="card-box card-green">
+            <div class="card-title">📊 BÁO CÁO & THỐNG KÊ</div>
+            <div class="card-desc">Truy xuất dữ liệu báo cáo BYT, BVT và biến động nhân sự theo thời gian thực.</div>
+            <div class="card-link">XEM BÁO CÁO ➔</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="card-box card-orange">
+            <div class="card-title">📈 NÂNG BẬC LƯƠNG & NGẠCH</div>
+            <div class="card-desc">Quản lý nâng lương, ngạch viên chức và cảnh báo danh sách đủ điều kiện nâng lương.</div>
+            <div class="card-link">XEM DANH SÁCH ➔</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown("""
+        <div class="card-box card-blue">
+            <div class="card-title">🏥 GPHN & ĐÀO TẠO CME</div>
+            <div class="card-desc">Quản lý Chứng chỉ hành nghề và tiến độ tích lũy 48 tiết CME của Bác sĩ / Điều dưỡng.</div>
+            <div class="card-link">XEM CHI TIẾT ➔</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="card-box card-teal">
+            <div class="card-title">🩺 QUẢN LÝ BHOI & SỨC KHỎE</div>
+            <div class="card-desc">Theo dõi chế độ bảo hiểm sở hữu, đóng xem và đợt khám sức khỏe định kỳ.</div>
+            <div class="card-link">CHI TIẾT ➔</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # --- KHỐI BÊN DƯỚI: CẢNH BÁO + 2 BIỂU ĐỒ (3 CỘT) ---
+    c_left, c_mid, c_right = st.columns([1.2, 1.4, 1.4])
+
+    # 1. Cột Cảnh báo tự động
+    with c_left:
+        st.subheader("📌 Cảnh báo tự động")
+        
+        st.markdown("""
+        <div class="alert-item">
+            <span class="badge-circle badge-red">12</span>
+            <b>⏳ Sắp hết hạn HĐLĐ</b><br>
+            <small style="color: gray;">Cần tái ký / gia hạn trong 30 ngày</small>
+        </div>
+        <div class="alert-item">
+            <span class="badge-circle badge-orange">08</span>
+            <b>💰 Đến hạn nâng bậc lương</b><br>
+            <small style="color: gray;">Đủ thời hạn nâng lương ngạch, bậc</small>
+        </div>
+        <div class="alert-item">
+            <span class="badge-circle badge-blue">25</span>
+            <b>⚠️ Cảnh báo thiếu giờ CME</b><br>
+            <small style="color: gray;">Chưa tích lũy đủ 48 tiết / 2 năm</small>
+        </div>
+        <div class="alert-item">
+            <span class="badge-circle badge-green">04</span>
+            <b>📜 GPHN cần cập nhật</b><br>
+            <small style="color: gray;">Bổ sung thông tin chứng chỉ mới</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # 2. Cột Biểu đồ Trình độ (Bar Chart)
+    with c_mid:
+        st.subheader("📊 Nhân sự theo Trình độ")
+        data_trinh_do = pd.DataFrame({
+            "Trình độ": ["Tiến sĩ / CKI", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp / Khác"],
+            "Số lượng": [25, 142, 450, 180, 80]
+        })
+        fig_bar = px.bar(
+            data_trinh_do, 
+            x="Trình độ", 
+            y="Số lượng", 
+            text="Số lượng",
+            color="Trình độ",
+            color_discrete_sequence=['#ff9200', '#5c6bc0', '#26a69a', '#9ccc65', '#ec407a']
+        )
+        fig_bar.update_layout(showlegend=False, margin=dict(l=10, r=10, t=20, b=20), height=320)
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    # 3. Cột Biểu đồ Phân loại Hợp đồng (Donut Chart)
+    with c_right:
+        st.subheader("🍩 Phân loại Hợp đồng")
+        data_hd = pd.DataFrame({
+            "Loại HĐ": ["Không xác định thời hạn", "Xác định thời hạn (1-3 năm)", "Thử việc / Ngắn hạn"],
+            "Số lượng": [520, 310, 47]
+        })
+        fig_donut = px.pie(
+            data_hd, 
+            names="Loại HĐ", 
+            values="Số lượng", 
+            hole=0.5,
+            color_discrete_sequence=['#0288d1', '#ff9200', '#00b074']
+        )
+        fig_donut.update_layout(
+            legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+            margin=dict(l=10, r=10, t=20, b=20),
+            height=320
+        )
+        st.plotly_chart(fig_donut, use_container_width=True)
+
+# ---------------------------------------------------------
+# MAN HINH 2: HỒ SƠ CÁN BỘ CNV (CHỨC NĂNG THỰC TẾ CSDL)
+# ---------------------------------------------------------
+elif menu == "👤 Hồ sơ Cán bộ CNV":
+    render_header()
+    st.markdown("---")
+    st.subheader("📁 QUẢN LÝ CÁN BỘ CNV BỆNH VIỆN BƯU ĐIỆN")
+    
+    tab_list, tab_add = st.tabs(["📋 Danh sách Nhân sự (Neon DB)", "➕ Thêm Nhân sự Mới"])
+    
+    with tab_list:
         if engine:
             try:
-                df_can_bo = pd.read_sql("SELECT * FROM can_bo ORDER BY ma_cb ASC", engine)
-                
-                col_s1, col_s2 = st.columns([3, 1])
-                tu_khoa = col_s1.text_input("🔍 Tìm kiếm theo Họ tên hoặc Mã Cán bộ:")
-                
-                if tu_khoa:
-                    df_can_bo = df_can_bo[
-                        df_can_bo['ho_ten'].astype(str).str.contains(tu_khoa, case=False, na=False) |
-                        df_can_bo['ma_cb'].astype(str).str.contains(tu_khoa, case=False, na=False)
-                    ]
-                
-                if df_can_bo.empty:
-                    st.info("Chưa có dữ liệu cán bộ trong CSDL Neon. Bạn hãy chuyển sang tab 'Thêm Cán bộ Mới' để nhập dữ liệu.")
+                df = pd.read_sql("SELECT * FROM can_bo ORDER BY ma_cb ASC", engine)
+                if df.empty:
+                    st.info("Chưa có dữ liệu nhân sự. Bạn hãy qua tab 'Thêm Nhân sự Mới' để khởi tạo.")
                 else:
-                    st.dataframe(
-                        df_can_bo.rename(columns={
-                            "ma_cb": "Mã CB",
-                            "ho_ten": "Họ và Tên",
-                            "chuc_danh": "Chức danh",
-                            "khoa_phong": "Khoa / Phòng",
-                            "loai_nhan_su": "Loại Nhân sự",
-                            "so_dienthoai": "Số điện thoại",
-                            "trang_thai": "Trạng thái"
-                        }),
-                        use_container_width=True
-                    )
-                    
-                    csv_data = df_can_bo.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button(
-                        label="📥 Tải về danh sách Cán bộ (File CSV)",
-                        data=csv_data,
-                        file_name="danh_sach_can_bo_buu_dien.csv",
-                        mime="text/csv"
-                    )
+                    st.dataframe(df, use_container_width=True)
             except Exception as e:
-                st.error(f"Lỗi truy vấn dữ liệu từ CSDL: {e}")
-
-    # --- 2.2 Thêm Cán bộ Mới ---
-    with tab_them_moi:
-        st.subheader("Nhập thông tin Hồ sơ Nhân sự mới")
-        with st.form("form_them_can_bo", clear_on_submit=True):
-            col_a, col_b = st.columns(2)
-            ma_cb = col_a.text_input("Mã Cán bộ (Ví dụ: CB001)*")
-            ho_ten = col_b.text_input("Họ và Tên Cán bộ*")
+                st.error(f"Lỗi tải dữ liệu: {e}")
+                
+    with tab_add:
+        with st.form("add_form"):
+            col1, col2 = st.columns(2)
+            ma_cb = col1.text_input("Mã Cán bộ*")
+            ho_ten = col2.text_input("Họ và Tên*")
+            chuc_danh = col1.selectbox("Chức danh", ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Hành chính"])
+            khoa_phong = col2.text_input("Khoa / Phòng")
             
-            chuc_danh = col_a.selectbox(
-                "Chức danh / Trình độ", 
-                ["BS CKI", "BS CKII", "Thạc sĩ", "Tiến sĩ", "Cử nhân Điều dưỡng", "Dược sĩ CKI", "Cử nhân Khác"]
-            )
-            khoa_phong = col_b.selectbox(
-                "Khoa / Phòng công tác", 
-                ["Khoa Cấp Cứu", "Khoa Dược", "Phòng TCKT", "Khoa Ngoại Tổng Hợp", "Khoa Khám Bệnh", "Khoa Hồi Sức Tích Cực", "Phòng Tổ Chức Cán Bộ"]
-            )
-            
-            loai_nhan_su = col_a.selectbox(
-                "Phân loại Nhân sự", 
-                ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Hành chính", "Kỹ thuật viên"]
-            )
-            so_dienthoai = col_b.text_input("Số điện thoại liên hệ")
-            
-            btn_submit = st.form_submit_button("💾 Lưu vào CSDL Neon")
-            
-            if btn_submit:
-                if not ma_cb or not ho_ten:
-                    st.error("❌ Vui lòng điền đầy đủ Mã Cán bộ và Họ tên!")
-                elif engine:
+            if st.form_submit_button("Lưu Hồ Sơ"):
+                if engine and ma_cb and ho_ten:
                     try:
                         with engine.connect() as conn:
-                            conn.execute(
-                                text("""
-                                    INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, loai_nhan_su, so_dienthoai)
-                                    VALUES (:ma_cb, :ho_ten, :chuc_danh, :khoa_phong, :loai_nhan_su, :so_dienthoai)
-                                """),
-                                {
-                                    "ma_cb": ma_cb.strip(),
-                                    "ho_ten": ho_ten.strip(),
-                                    "chuc_danh": chuc_danh,
-                                    "khoa_phong": khoa_phong,
-                                    "loai_nhan_su": loai_nhan_su,
-                                    "so_dienthoai": so_dienthoai.strip()
-                                }
-                            )
+                            conn.execute(text("INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong) VALUES (:m, :h, :c, :k)"),
+                                         {"m": ma_cb, "h": ho_ten, "c": chuc_danh, "k": khoa_phong})
                             conn.commit()
-                        st.success(f"✅ Thêm thành công cán bộ **{ho_ten}** ({ma_cb}) vào Database Neon!")
+                        st.success("Đã thêm cán bộ thành công!")
                         st.rerun()
-                    except Exception as err:
-                        st.error(f"❌ Lỗi khi lưu dữ liệu (Mã Cán bộ '{ma_cb}' có thể đã tồn tại): {err}")
+                    except Exception as e:
+                        st.error(f"Lỗi: {e}")
 
 # ---------------------------------------------------------
-# TAB 3: BÁO CÁO & THỐNG KÊ
+# MẶC ĐỊNH CHO CÁC MỤC CÒN LẠI (GIAO DIỆN CHỜ PHOI)
 # ---------------------------------------------------------
-elif menu == "Báo cáo & Thống kê":
-    st.title("📈 BÁO CÁO & THỐNG KÊ NHÂN SỰ")
-    
-    if engine:
-        try:
-            df = pd.read_sql("SELECT * FROM can_bo", engine)
-            
-            if df.empty:
-                st.info("💡 Chưa có dữ liệu thực tế trong CSDL. Vui lòng vào tab **'Hồ sơ Cán bộ'** để thêm thông tin nhân sự.")
-            else:
-                st.subheader("📊 Biểu đồ Phân tích Nhân sự Thời gian thực")
-                
-                col_chart1, col_chart2 = st.columns(2)
-                
-                with col_chart1:
-                    st.markdown("##### Cơ cấu Nhân sự theo Khoa / Phòng")
-                    fig_khoa = px.pie(
-                        df, 
-                        names='khoa_phong', 
-                        title='Tỷ lệ Cán bộ theo Khoa/Phòng',
-                        hole=0.4,
-                        color_discrete_sequence=px.colors.qualitative.Pastel
-                    )
-                    st.plotly_chart(fig_khoa, use_container_width=True)
-                    
-                with col_chart2:
-                    st.markdown("##### Phân bổ Trình độ & Phân loại Nhân sự")
-                    fig_trinh_do = px.bar(
-                        df, 
-                        x='chuc_danh', 
-                        color='loai_nhan_su',
-                        title='Số lượng theo Trình độ chuyên môn',
-                        barmode='stack',
-                        color_discrete_sequence=px.colors.qualitative.Set2
-                    )
-                    st.plotly_chart(fig_trinh_do, use_container_width=True)
-                
-                st.markdown("---")
-                st.subheader("📋 Bảng tổng hợp theo Loại Nhân sự")
-                df_summary = df.groupby(['loai_nhan_su', 'chuc_danh']).size().reset_index(name='Số lượng')
-                st.dataframe(df_summary, use_container_width=True)
-                
-        except Exception as e:
-            st.error(f"Lỗi tải dữ liệu báo cáo: {e}")
+else:
+    render_header()
+    st.markdown("---")
+    st.info(f"⚙️ Chức năng **{menu}** đang được đồng bộ dữ liệu. Giao diện đã sẵn sàng!")
