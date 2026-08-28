@@ -6,7 +6,7 @@ import plotly.express as px
 from sqlalchemy import create_engine, text
 
 # ---------------------------------------------------------
-# 1. CẤU HÌNH TRANG & CSS GIAO DIỆN SẮC NÉT & ĐỒ HỌA 3D
+# 1. CẤU HÌNH TRANG & CSS GIAO DIỆN SẮC NÉT
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="BỆNH VIỆN BƯU ĐIỆN - Hệ thống Quản trị Nhân sự & Điều hành",
@@ -69,46 +69,46 @@ st.markdown("""
         box-shadow: 0 0 0 3px rgba(0, 102, 178, 0.2) !important;
     }
 
-    /* NÚT ĐĂNG NHẬP 3D */
+    /* NÚT ĐĂNG NHẬP MÀU XANH DƯƠNG - CHỮ ĐẬM */
     div.stButton > button[key="btn_login"] {
         background: linear-gradient(180deg, #0080e5 0%, #0056a3 100%) !important;
         color: #ffffff !important;
-        font-weight: 700 !important;
+        font-weight: 800 !important;
         font-size: 15px !important;
         border-radius: 8px !important;
         border: 1px solid #004080 !important;
         height: 44px !important;
-        box-shadow: 0 5px 0px #003366, 0 8px 12px rgba(0,0,0,0.2) !important;
+        box-shadow: 0 4px 0px #003366, 0 6px 10px rgba(0,0,0,0.15) !important;
         transition: all 0.1s ease !important;
-        text-shadow: 0px 1px 2px rgba(0,0,0,0.4);
+        text-shadow: 0px 1px 2px rgba(0,0,0,0.3);
     }
     div.stButton > button[key="btn_login"]:hover {
         background: linear-gradient(180deg, #0090ff 0%, #0062b8 100%) !important;
     }
     div.stButton > button[key="btn_login"]:active {
-        box-shadow: 0 2px 0px #003366, 0 3px 6px rgba(0,0,0,0.2) !important;
-        transform: translateY(3px) !important;
+        box-shadow: 0 2px 0px #003366, 0 3px 5px rgba(0,0,0,0.2) !important;
+        transform: translateY(2px) !important;
     }
 
-    /* NÚT THOÁT 3D */
+    /* NÚT THOÁT MÀU XANH DƯƠNG NHẸ/TRUNG - CHỮ ĐẬM */
     div.stButton > button[key="btn_exit"] {
-        background: linear-gradient(180deg, #f87171 0%, #dc2626 100%) !important;
+        background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%) !important;
         color: #ffffff !important;
-        font-weight: 700 !important;
+        font-weight: 800 !important;
         font-size: 15px !important;
         border-radius: 8px !important;
-        border: 1px solid #991b1b !important;
+        border: 1px solid #1e40af !important;
         height: 44px !important;
-        box-shadow: 0 5px 0px #7f1d1d, 0 8px 12px rgba(0,0,0,0.2) !important;
+        box-shadow: 0 4px 0px #1e3a8a, 0 6px 10px rgba(0,0,0,0.15) !important;
         transition: all 0.1s ease !important;
-        text-shadow: 0px 1px 2px rgba(0,0,0,0.4);
+        text-shadow: 0px 1px 2px rgba(0,0,0,0.3);
     }
     div.stButton > button[key="btn_exit"]:hover {
-        background: linear-gradient(180deg, #ff8585 0%, #e11d48 100%) !important;
+        background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%) !important;
     }
     div.stButton > button[key="btn_exit"]:active {
-        box-shadow: 0 2px 0px #7f1d1d, 0 3px 6px rgba(0,0,0,0.2) !important;
-        transform: translateY(3px) !important;
+        box-shadow: 0 2px 0px #1e3a8a, 0 3px 5px rgba(0,0,0,0.2) !important;
+        transform: translateY(2px) !important;
     }
 
     .card-box {
@@ -198,20 +198,21 @@ def render_login():
                 encoded_img = base64.b64encode(f.read()).decode("utf-8")
             st.markdown(
                 f"""
-                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
                     <img src="data:image/png;base64,{encoded_img}" width="200" style="object-fit: contain;">
                 </div>
                 """,
                 unsafe_allow_html=True
             )
         else:
-            st.markdown('<div style="display: flex; justify-content: center; align-items: center; margin-bottom: 15px;">', unsafe_allow_html=True)
+            st.markdown('<div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">', unsafe_allow_html=True)
             st.image("logo.png", width=200)
             st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
         st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
 
+        # Mở khung đăng nhập trực tiếp (đã xóa ô trắng thừa)
         st.markdown("<div class='login-card'>", unsafe_allow_html=True)
         
         username = st.text_input("Tên đăng nhập / Username:", placeholder="Nhập tên đăng nhập...")
