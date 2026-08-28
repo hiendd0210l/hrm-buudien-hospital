@@ -322,7 +322,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
     
-  # TAB 1: DANH SÁCH & XÓA (ĐÃ KHẮC PHỤC LỖI HỦY THAO TÁC)
+  # TAB 1: DANH SÁCH & XÓA (ĐÃ KHẮC PHỤC TRIỆT ĐỂ LỖI SESSION_STATE)
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -394,9 +394,15 @@ def render_quan_ly_can_bo():
                 label = f"{mcb} - {hoten} ({khoa})"
                 options_del.append(label)
                 mapping_del[label] = row['id']
-                
+            
+            # Sử dụng cờ hiệu (flag) để kiểm soát việc reset selectbox trước khi nó khởi tạo
+            if "clear_selection" in st.session_state and st.session_state["clear_selection"]:
+                if "select_del" in st.session_state:
+                    del st.session_state["select_del"]
+                st.session_state["clear_selection"] = False
+
             selected_del_label = col_del1.selectbox("Chọn nhân sự muốn xóa:", options_del, key="select_del")
-            target_id = mapping_del[selected_del_label]
+            target_id = mapping_del.get(selected_del_label, None)
             
             if col_del2.button("🗑️ Xóa nhân sự", use_container_width=True):
                 if target_id is None:
@@ -409,8 +415,8 @@ def render_quan_ly_can_bo():
                     st.rerun()
                     
             if col_del3.button("❌ Hủy thao tác", use_container_width=True):
-                # Đặt lại state về vị trí đầu tiên (phần tử số 0 tương ứng với "-- Chọn nhân sự để xóa --")
-                st.session_state["select_del"] = options_del[0]
+                # Đặt cờ hiệu yêu cầu xóa state của selectbox trước khi trang vẽ lại
+                st.session_state["clear_selection"] = True
                 st.toast("Đã hủy thao tác chọn nhân sự.")
                 st.rerun()
 
