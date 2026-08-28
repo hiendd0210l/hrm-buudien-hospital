@@ -280,7 +280,12 @@ def render_quan_ly_can_bo():
 
     # TAB 1: DANH SÁCH & XÓA CÁ NHÂN
     with tab1:
-        st.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
+        col_t1, col_t2 = st.columns([4, 1])
+        col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
+        if col_t2.button("🔄 Tải lại dữ liệu"):
+            st.cache_data.clear()
+            st.rerun()
+
         if df.empty:
             st.info("Chưa có dữ liệu nhân sự trong cơ sở dữ liệu. Bạn có thể thêm mới hoặc nhập từ file Excel.")
         else:
@@ -298,6 +303,7 @@ def render_quan_ly_can_bo():
                 with engine.connect() as conn:
                     conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
                     conn.commit()
+                st.cache_data.clear()
                 st.success(f"Đã xóa thành công nhân sự [{selected_del}]!")
                 st.rerun()
 
@@ -329,6 +335,7 @@ def render_quan_ly_can_bo():
                                     VALUES (:m, :h, :c, :k, :t, :s, :e)
                                 """), {"m": ma_cb.strip(), "h": ho_ten.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email})
                                 conn.commit()
+                            st.cache_data.clear()
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
                             st.rerun()
                         except Exception as ex:
@@ -374,18 +381,19 @@ def render_quan_ly_can_bo():
                                     WHERE id = :id
                                 """), {"m": ma_cb.strip(), "h": ho_ten.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email, "id": edit_id})
                                 conn.commit()
+                            st.cache_data.clear()
                             st.success("Đã cập nhật thông tin thành công!")
                             st.rerun()
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ CẢI TIẾN THÔNG MINH)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (XỬ LÝ TRỰC TIẾP LƯU DATABASE)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
         with col_m1:
             st.markdown("##### 📥 **1. Tải về file Excel mẫu**")
-            st.caption("Hãy dùng file mẫu này để chuẩn hóa 100% dữ liệu.")
+            st.caption("Hãy dùng file mẫu này để hệ thống nhận diện chính xác 100%.")
             
             sample_df = pd.DataFrame({
                 'Mã Cán bộ': ['CB001', 'CB002'],
@@ -416,68 +424,69 @@ def render_quan_ly_can_bo():
             if uploaded_file is not None:
                 try:
                     df_up = pd.read_excel(uploaded_file)
-                    st.markdown("**Xem trước dữ liệu nhận diện:**")
+                    st.markdown("**Xem trước 5 dòng đầu tiên trong file:**")
                     st.dataframe(df_up.head(5), use_container_width=True)
                     
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
-                        # Tự động tìm kiếm tên cột tương ứng bất kể cách đặt tên
-                        def find_col(possible_names, df_cols):
-                            for col in df_cols:
+                        cols = df_up.columns.tolist()
+                        
+                        # Tự động quét thông minh các cột
+                        def get_col(possible_names):
+                            for col in cols:
                                 c_clean = str(col).lower().replace(" ", "").replace("_", "").replace("/", "")
                                 for p in possible_names:
-                                    p_clean = p.lower().replace(" ", "").replace("_", "").replace("/", "")
-                                    if p_clean in c_clean:
+                                    if p in c_clean:
                                         return col
                             return None
 
-                        col_macb = find_col(['macanbo', 'macb', 'manhanvien', 'manv', 'stt', 'id'], df_up.columns)
-                        col_hoten = find_col(['hovaten', 'hoten', 'tencanbo', 'tennhanvien', 'fullname', 'ten'], df_up.columns)
-                        col_chucdanh = find_col(['chucdanh', 'chucvu', 'vitri'], df_up.columns)
-                        col_khoaphong = find_col(['khoaphong', 'khoa', 'phong', 'phongban', 'donvi'], df_up.columns)
-                        col_trinhdo = find_col(['trinhdo', 'bangcap', 'hocluc'], df_up.columns)
-                        col_sdt = find_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone'], df_up.columns)
-                        col_email = find_col(['email', 'thu-dien-tu', 'mail'], df_up.columns)
+                        c_macb = get_col(['macanbo', 'macb', 'manhanvien', 'manv', 'stt', 'id'])
+                        c_hoten = get_col(['hovaten', 'hoten', 'tencanbo', 'tennhanvien', 'fullname', 'ten'])
+                        c_chucdanh = get_col(['chucdanh', 'chucvu', 'vitri'])
+                        c_khoaphong = get_col(['khoaphong', 'khoa', 'phong', 'phongban', 'donvi'])
+                        c_trinhdo = get_col(['trinhdo', 'bangcap', 'hocluc'])
+                        c_sdt = get_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone'])
+                        c_email = get_col(['email', 'mail'])
 
-                        # Nếu không nhận diện được cột Tên, tự động lấy 2 cột đầu tiên
-                        if not col_hoten and len(df_up.columns) >= 2:
-                            col_macb = df_up.columns[0]
-                            col_hoten = df_up.columns[1]
+                        # Nếu không map được cột tên, lấy mặc định cột 0 và 1
+                        if not c_hoten and len(cols) >= 2:
+                            c_macb = cols[0]
+                            c_hoten = cols[1]
 
-                        count_success = 0
+                        count_inserted = 0
                         with engine.connect() as conn:
                             for idx, row in df_up.iterrows():
-                                # Lấy giá trị từng dòng
-                                m = str(row[col_macb]).strip() if col_macb and pd.notna(row[col_macb]) else f"CB{idx+1:03d}"
-                                h = str(row[col_hoten]).strip() if col_hoten and pd.notna(row[col_hoten]) else ''
-                                c = str(row[col_chucdanh]).strip() if col_chucdanh and pd.notna(row[col_chucdanh]) else ''
-                                k = str(row[col_khoaphong]).strip() if col_khoaphong and pd.notna(row[col_khoaphong]) else ''
-                                t = str(row[col_trinhdo]).strip() if col_trinhdo and pd.notna(row[col_trinhdo]) else ''
-                                s = str(row[col_sdt]).strip() if col_sdt and pd.notna(row[col_sdt]) else ''
-                                e = str(row[col_email]).strip() if col_email and pd.notna(row[col_email]) else ''
+                                h = str(row[c_hoten]).strip() if c_hoten and pd.notna(row[c_hoten]) else ''
+                                m = str(row[c_macb]).strip() if c_macb and pd.notna(row[c_macb]) else f"CB{idx+1:03d}"
+                                c = str(row[c_chucdanh]).strip() if c_chucdanh and pd.notna(row[c_chucdanh]) else ''
+                                k = str(row[c_khoaphong]).strip() if c_khoaphong and pd.notna(row[c_khoaphong]) else ''
+                                t = str(row[c_trinhdo]).strip() if c_trinhdo and pd.notna(row[c_trinhdo]) else ''
+                                s = str(row[c_sdt]).strip() if c_sdt and pd.notna(row[c_sdt]) else ''
+                                e = str(row[c_email]).strip() if c_email and pd.notna(row[c_email]) else ''
 
                                 if h and h.lower() != 'nan':
-                                    try:
-                                        conn.execute(text("""
-                                            INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
-                                            VALUES (:m, :h, :c, :k, :t, :s, :e)
-                                            ON CONFLICT (ma_cb) DO UPDATE SET
-                                                ho_ten = EXCLUDED.ho_ten,
-                                                chuc_danh = EXCLUDED.chuc_danh,
-                                                khoa_phong = EXCLUDED.khoa_phong,
-                                                trinh_do = EXCLUDED.trinh_do,
-                                                so_dien_thoai = EXCLUDED.so_dien_thoai,
-                                                email = EXCLUDED.email;
-                                        """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
-                                        count_success += 1
-                                    except Exception as ex_item:
-                                        pass
-                            conn.commit()
+                                    conn.execute(text("""
+                                        INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                        VALUES (:m, :h, :c, :k, :t, :s, :e)
+                                        ON CONFLICT (ma_cb) DO UPDATE SET
+                                            ho_ten = EXCLUDED.ho_ten,
+                                            chuc_danh = EXCLUDED.chuc_danh,
+                                            khoa_phong = EXCLUDED.khoa_phong,
+                                            trinh_do = EXCLUDED.trinh_do,
+                                            so_dien_thoai = EXCLUDED.so_dien_thoai,
+                                            email = EXCLUDED.email;
+                                    """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                    count_inserted += 1
                             
-                        if count_success > 0:
-                            st.success(f"🎉 Đã nhập thành công {count_success} nhân sự vào hệ thống!")
+                            conn.commit()
+                        
+                        st.cache_data.clear() # Xóa bộ nhớ tạm ép ứng dụng đọc lại dữ liệu mới từ Postgres
+                        
+                        if count_inserted > 0:
+                            st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự vào CSDL Neon!")
                             st.rerun()
                         else:
-                            st.error("❌ Không tìm thấy thông tin Họ và Tên hợp lệ trong file Excel. Vui lòng kiểm tra lại file hoặc sử dụng File Mẫu của hệ thống!")
+                            st.error("❌ Không tìm thấy cột Họ và Tên hợp lệ. Vui lòng sử dụng File Excel Mẫu của hệ thống!")
+
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
 
