@@ -88,7 +88,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON & TỰ ĐỘNG SỬA SCHEMA
+# 2. KẾT NỐI DATABASE NEON & TỰ ĐỘNG BỎ RÀNG BUỘC NOT NULL TOÀN BẢNG
 # ---------------------------------------------------------
 def get_db_engine():
     try:
@@ -105,6 +105,7 @@ def get_db_engine():
             return None
 
         with eng.connect() as conn:
+            # Tạo bảng nếu chưa tồn tại
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS can_bo (
                     id SERIAL PRIMARY KEY,
@@ -121,7 +122,7 @@ def get_db_engine():
             """))
             conn.commit()
 
-            # Thêm cột nếu chưa tồn tại
+            # Thêm cột cơ bản nếu thiếu
             columns_to_check = [
                 ("ma_can_bo", "VARCHAR(50)"),
                 ("ho_ten", "VARCHAR(255)"),
@@ -136,11 +137,19 @@ def get_db_engine():
             for col_name, col_type in columns_to_check:
                 conn.execute(text(f"ALTER TABLE can_bo ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
 
-            # Tự động gỡ bỏ ràng buộc NOT NULL của tất cả các cột ngoại trừ 'id' để không bao giờ bị lỗi Upload Excel
-            not_null_cols = ['ma_can_bo', 'ngay_sinh', 'so_cccd', 'ho_ten', 'chuc_danh', 'khoa_phong', 'trinh_do', 'so_dien_thoai', 'email']
-            for col_name in not_null_cols:
+            # TỰ ĐỘNG QUÉT VÀ BỎ 'NOT NULL' TRÊN TẤT CẢ CÁC CỘT CỦA BẢNG can_bo (TRỪ ID)
+            res = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'can_bo' 
+                  AND is_nullable = 'NO' 
+                  AND column_name != 'id';
+            """)).fetchall()
+
+            for row in res:
+                col_to_drop = row[0]
                 try:
-                    conn.execute(text(f"ALTER TABLE can_bo ALTER COLUMN {col_name} DROP NOT NULL;"))
+                    conn.execute(text(f'ALTER TABLE can_bo ALTER COLUMN "{col_to_drop}" DROP NOT NULL;'))
                 except Exception:
                     pass
 
@@ -408,7 +417,7 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ FIX TRIỆT ĐỂ LỖI SO_CCCD & NULL)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -480,14 +489,12 @@ def render_quan_ly_can_bo():
                             for idx, row in df_up.iterrows():
                                 h = str(row[c_hoten]).strip() if c_hoten and pd.notna(row[c_hoten]) else ''
                                 
-                                # Mã Cán bộ
                                 raw_m = str(row[c_macb]).strip() if c_macb and pd.notna(row[c_macb]) else ''
                                 if not raw_m or raw_m.lower() == 'nan':
                                     m = f"CB{idx+1:04d}"
                                 else:
                                     m = raw_m
 
-                                # Ngày sinh
                                 ns_val = None
                                 if c_ngaysinh and pd.notna(row[c_ngaysinh]):
                                     try:
@@ -495,7 +502,6 @@ def render_quan_ly_can_bo():
                                     except Exception:
                                         ns_val = None
 
-                                # Số CCCD
                                 cccd_val = str(row[c_cccd]).strip() if c_cccd and pd.notna(row[c_cccd]) else ''
                                 if cccd_val.lower() == 'nan':
                                     cccd_val = ''
