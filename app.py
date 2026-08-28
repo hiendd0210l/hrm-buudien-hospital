@@ -13,55 +13,122 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS cho màn hình đăng nhập & giao diện chính
+# Custom CSS chuyên nghiệp cho màn hình đăng nhập & Dashboard
 st.markdown("""
 <style>
-    /* CSS Màn hình Đăng nhập */
-    .login-box {
-        background-color: #f8f9fa;
-        padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        border: 1px solid #e9ecef;
-        margin-top: 10px;
-    }
-    .login-title {
-        color: #0056b3;
-        font-weight: bold;
-        text-align: center;
-        font-size: 24px;
-        margin-top: 10px;
-    }
-    .login-subtitle {
-        color: #6c757d;
-        text-align: center;
-        font-size: 14px;
-        margin-bottom: 25px;
-    }
-    
-    /* Style nút bấm Đăng nhập & Thoát */
-    div.stButton > button[key="btn_login"] {
-        background-color: #007bff !important;
-        color: white !important;
-        font-weight: bold !important;
-        border-radius: 6px !important;
-        border: none !important;
-    }
-    div.stButton > button[key="btn_exit"] {
-        background-color: #007bff !important;
-        color: white !important;
-        font-weight: bold !important;
-        border-radius: 6px !important;
-        border: none !important;
+    /* Gradient nền chính cho toàn bộ trang đăng nhập */
+    .stApp {
+        background: linear-gradient(135deg, #eef2f7 0%, #e3edf7 100%);
     }
 
-    /* CSS Giao diện Dashboard chính */
+    /* Khung Card Login trung tâm */
+    .login-container {
+        max-width: 450px;
+        margin: 30px auto 0 auto;
+        background: #ffffff;
+        padding: 35px 30px 30px 30px;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 82, 204, 0.12);
+        border: 1px solid #e1e8f0;
+        text-align: center;
+    }
+
+    /* Khung hiển thị Logo nổi bật */
+    .logo-wrapper {
+        background: #ffffff;
+        width: 110px;
+        height: 110px;
+        margin: -85px auto 15px auto;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 6px 16px rgba(0, 82, 204, 0.18);
+        border: 4px solid #ffffff;
+    }
+
+    .logo-wrapper img {
+        width: 85px;
+        height: auto;
+    }
+
+    /* Tiêu đề trang đăng nhập */
+    .brand-title {
+        color: #003b95;
+        font-weight: 800;
+        font-size: 22px;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+        color: #5a6e85;
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 25px;
+    }
+
+    /* Tùy chỉnh nhãn & ô nhập liệu */
+    .stTextInput > label {
+        color: #2c3e50 !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+    }
+
+    .stTextInput > div > div > input {
+        border-radius: 8px !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 10px 14px !important;
+        font-size: 14px !important;
+    }
+
+    .stTextInput > div > div > input:focus {
+        border-color: #0052cc !important;
+        box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.15) !important;
+    }
+
+    /* Style nút Đăng nhập & Thoát */
+    div.stButton > button[key="btn_login"] {
+        background: linear-gradient(135deg, #0052cc 0%, #0066ff 100%) !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 14px !important;
+        border-radius: 8px !important;
+        border: none !important;
+        padding: 10px 0 !important;
+        box-shadow: 0 4px 12px rgba(0, 82, 204, 0.25) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    div.stButton > button[key="btn_login"]:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(0, 82, 204, 0.35) !important;
+    }
+
+    div.stButton > button[key="btn_exit"] {
+        background: #f1f5f9 !important;
+        color: #475569 !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        border-radius: 8px !important;
+        border: 1px solid #cbd5e1 !important;
+        padding: 10px 0 !important;
+        transition: all 0.2s ease !important;
+    }
+
+    div.stButton > button[key="btn_exit"]:hover {
+        background: #e2e8f0 !important;
+        color: #1e293b !important;
+    }
+
+    /* Custom CSS Dashboard Card */
     .card-box {
         padding: 20px;
-        border-radius: 10px;
+        border-radius: 12px;
         color: white;
         margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         min-height: 130px;
     }
     .card-red { background: linear-gradient(135deg, #e53935, #d32f2f); }
@@ -70,8 +137,8 @@ st.markdown("""
     .card-dark { background: linear-gradient(135deg, #37474f, #263238); }
     .card-orange { background: linear-gradient(135deg, #ff9200, #e67e00); }
     .card-teal { background: linear-gradient(135deg, #00a896, #028090); }
-    
-    .card-title { font-size: 16px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+
+    .card-title { font-size: 15px; font-weight: bold; margin-bottom: 6px; text-transform: uppercase; }
     .card-desc { font-size: 12px; opacity: 0.9; margin-bottom: 10px; }
     .card-link { font-size: 11px; font-weight: bold; text-align: right; text-transform: uppercase; }
 
@@ -79,8 +146,8 @@ st.markdown("""
         background-color: #ffffff;
         border: 2px solid;
         border-radius: 50%;
-        width: 32px;
-        height: 32px;
+        width: 30px;
+        height: 30px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -91,18 +158,19 @@ st.markdown("""
     .badge-orange { border-color: #ff9200; color: #ff9200; }
     .badge-blue { border-color: #29b6f6; color: #29b6f6; }
     .badge-green { border-color: #00b074; color: #00b074; }
-    
+
     .alert-item {
-        background-color: #f8f9fa;
+        background-color: #ffffff;
         padding: 12px 15px;
         border-radius: 8px;
         margin-bottom: 10px;
         border-left: 4px solid #00b074;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Khởi tạo trạng thái đăng nhập
+# Khởi tạo session lưu trạng thái đăng nhập
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
@@ -129,53 +197,51 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. MÀN HÌNH ĐĂNG NHẬP (LƯU TRẠNG THÁI SESSION)
+# 3. MÀN HÌNH ĐĂNG NHẬP SANG TRỌNG & NỔI BẬT LOGO
 # ---------------------------------------------------------
 def render_login():
-    # Căn giữa màn hình bằng 3 cột
-    col_left, col_center, col_right = st.columns([1, 1.8, 1])
-    
-    with col_center:
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Logo Bệnh viện Bưu điện VNPT
-        c_img1, c_img2, c_img3 = st.columns([1, 1, 1])
-        with c_img2:
-            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/VNPT_Logo.svg/1200px-VNPT_Logo.svg.png", width=120)
-            
-        st.markdown("<div class='login-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
-        st.markdown("<div class='login-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
-        
-        # Khung chứa Form Đăng nhập
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col_l, col_main, col_r = st.columns([1, 1.2, 1])
+
+    with col_main:
+        # Khung Logo Nổi bật đặt đè lên Card
+        st.markdown("""
+        <div class="logo-wrapper">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/VNPT_Logo.svg/1200px-VNPT_Logo.svg.png" alt="VNPT Logo">
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Khung Form Đăng nhập
         with st.container():
-            st.markdown("<div class='login-box'>", unsafe_allow_html=True)
-            
-            username = st.text_input("Tên đăng nhập / Username:", placeholder="Nhập tên đăng nhập...")
-            password = st.text_input("Mật khẩu / Password:", type="password", placeholder="Nhập mật khẩu...")
-            
+            st.markdown("<div class='login-container'>", unsafe_allow_html=True)
+            st.markdown("<div class='brand-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
+            st.markdown("<div class='brand-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
+
+            username = st.text_input("Tên đăng nhập / Username", placeholder="Tên tài khoản...")
+            password = st.text_input("Mật khẩu / Password", type="password", placeholder="••••••••")
+
             st.markdown("<br>", unsafe_allow_html=True)
-            btn_col1, btn_col2 = st.columns(2)
-            
+            btn_col1, btn_col2 = st.columns([1.5, 1])
+
             with btn_col1:
-                if st.button("🔑 Đăng nhập", key="btn_login", use_container_width=True):
+                if st.button("🔑 ĐĂNG NHẬP", key="btn_login", use_container_width=True):
                     if username == "admin" and password == "admin123":
                         st.session_state['logged_in'] = True
                         st.success("Đăng nhập thành công!")
                         st.rerun()
                     else:
-                        st.error("❌ Tên đăng nhập hoặc mật khẩu không chính xác!")
-                        
+                        st.error("❌ Tên đăng nhập hoặc mật khẩu sai!")
+
             with btn_col2:
-                if st.button("❌ Thoát", key="btn_exit", use_container_width=True):
-                    st.info("Đã đóng phiên làm việc.")
-                    
+                if st.button("✕ Thoát", key="btn_exit", use_container_width=True):
+                    st.info("Phiên làm việc tạm dừng.")
+
             st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 4. GIAO DIỆN CHÍNH (SAU KHI ĐĂNG NHẬP THÀNH CÔNG)
+# 4. GIAO DIỆN CHÍNH (SAU KHI ĐĂNG NHẬP)
 # ---------------------------------------------------------
 def render_dashboard():
-    # --- SIDEBAR DANH MỤC CHỨC NĂNG ---
     st.sidebar.title("DANH MỤC CHỨC NĂNG")
     st.sidebar.caption("👤 **Xin chào:** Đoàn Danh Hiển")
 
@@ -215,11 +281,9 @@ def render_dashboard():
         st.title("Xin chào, Đoàn Danh Hiển")
         st.caption("Quản trị viên Hệ thống — Bệnh viện Bưu điện")
 
-    # --- TAB 1: TRANG CHỦ / DASHBOARD ---
     if menu == "📌 Trang chủ / Dashboard":
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Grid 6 thẻ
+
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown("<div class='card-box card-red'><div class='card-title'>👨‍⚕️ HỒ SƠ CÁN BỘ CNV</div><div class='card-desc'>Theo dõi, cập nhật và quản lý toàn bộ danh sách hồ sơ 877 nhân sự toàn bệnh viện.</div><div class='card-link'>XEM CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
@@ -235,7 +299,6 @@ def render_dashboard():
 
         st.markdown("---")
 
-        # Cảnh báo & Biểu đồ
         c_left, c_mid, c_right = st.columns([1.2, 1.4, 1.4])
         with c_left:
             st.subheader("📌 Cảnh báo tự động")
@@ -260,23 +323,22 @@ def render_dashboard():
             fig_donut.update_layout(legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5), margin=dict(l=10, r=10, t=20, b=20), height=320)
             st.plotly_chart(fig_donut, use_container_width=True)
 
-    # --- TAB 2: HỒ SƠ CÁN BỘ CNV ---
     elif menu == "👤 Hồ sơ Cán bộ CNV":
         st.markdown("---")
         st.subheader("📁 QUẢN LÝ CÁN BỘ CNV BỆNH VIỆN BƯU ĐIỆN")
         tab_list, tab_add = st.tabs(["📋 Danh sách Nhân sự (Neon DB)", "➕ Thêm Nhân sự Mới"])
-        
+
         with tab_list:
             if engine:
                 try:
                     df = pd.read_sql("SELECT * FROM can_bo ORDER BY ma_cb ASC", engine)
                     if df.empty:
-                        st.info("Chưa có dữ liệu nhân sự trong CSDL Neon. Vui lòng chuyển sang tab 'Thêm Nhân sự Mới'.")
+                        st.info("Chưa có dữ liệu nhân sự trong CSDL Neon.")
                     else:
                         st.dataframe(df, use_container_width=True)
                 except Exception as e:
                     st.error(f"Lỗi truy vấn CSDL: {e}")
-                    
+
         with tab_add:
             with st.form("add_form"):
                 col1, col2 = st.columns(2)
@@ -284,7 +346,7 @@ def render_dashboard():
                 ho_ten = col2.text_input("Họ và Tên*")
                 chuc_danh = col1.selectbox("Chức danh", ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Hành chính"])
                 khoa_phong = col2.text_input("Khoa / Phòng")
-                
+
                 if st.form_submit_button("Lưu Hồ Sơ"):
                     if engine and ma_cb and ho_ten:
                         try:
@@ -298,10 +360,10 @@ def render_dashboard():
                             st.error(f"Lỗi: {e}")
     else:
         st.markdown("---")
-        st.info(f"⚙️ Chức năng **{menu}** đang trong quá trình đồng bộ dữ liệu.")
+        st.info(f"⚙️ Chức năng **{menu}** đang được đồng bộ dữ liệu.")
 
 # ---------------------------------------------------------
-# 5. ĐIỀU HƯỚNG MÀN HÌNH THEO TRẠNG THÁI ĐĂNG NHẬP
+# 5. ĐIỀU HƯỚNG MÀN HÌNH
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     render_login()
