@@ -274,6 +274,29 @@ def render_dashboard_home():
 # ---------------------------------------------------------
 # 5. QUẢN LÝ CÁN BỘ CNV
 # ---------------------------------------------------------
+def init_db():
+    if engine:
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS can_bo (
+                        id SERIAL PRIMARY KEY,
+                        ma_can_bo VARCHAR(50),
+                        ho_ten VARCHAR(255) NOT NULL,
+                        ngay_sinh DATE,
+                        so_cccd VARCHAR(50),
+                        chuc_danh VARCHAR(255),
+                        khoa_phong VARCHAR(255),
+                        trinh_do VARCHAR(255),
+                        so_dien_thoai VARCHAR(50),
+                        email VARCHAR(255)
+                    );
+                """))
+        except Exception as e:
+            st.error(f"Lỗi khởi tạo bảng CSDL: {e}")
+
+# Gọi hàm khởi tạo bảng khi chạy app
+init_db()
 def render_quan_ly_can_bo():
     st.markdown("---")
     st.subheader("📁 QUẢN LÝ CÁN BỘ CNV BỆNH VIỆN BƯU ĐIỆN")
