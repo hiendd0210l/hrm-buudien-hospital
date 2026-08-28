@@ -278,10 +278,11 @@ def init_db():
     if engine:
         try:
             with engine.begin() as conn:
+                # Tạo bảng và đảm bảo ma_can_bo là UNIQUE để chống trùng lặp
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS can_bo (
                         id SERIAL PRIMARY KEY,
-                        ma_can_bo VARCHAR(50),
+                        ma_can_bo VARCHAR(50) UNIQUE,
                         ho_ten VARCHAR(255) NOT NULL,
                         ngay_sinh DATE,
                         so_cccd VARCHAR(50),
@@ -292,8 +293,14 @@ def init_db():
                         email VARCHAR(255)
                     );
                 """))
+                # Tạo index unique phòng trường hợp bảng cũ chưa có constraint
+                conn.execute(text("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_can_bo_ma_unique ON can_bo (ma_can_bo);
+                """))
         except Exception as e:
-            st.error(f"Lỗi khởi tạo bảng CSDL: {e}")
+            st.error(f"Lỗi khởi tạo CSDL: {e}")
+
+init_db()
 
 # Gọi hàm khởi tạo bảng khi chạy app
 init_db()
@@ -460,7 +467,7 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ TỐI ƯU ÁNH XẠ & THÔNG BÁO RÕ RÀNG)
+   # TAB 3: TẢI MẪU & UPLOAD EXCEL (CHỐNG TRÙNG LẶP & HIỂN THỊ THÔNG BÁO RÕ RÀNG)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -472,7 +479,6 @@ def render_quan_ly_can_bo():
                 'Ma_NV': ['N0003', 'N0009', 'N0125'],
                 'Ho_Ten': ['Trần Hùng Mạnh', 'Phạm Thị Thanh Tú', 'Phạm Trường Giang'],
                 'Ten_Goi_Khac': ['BVBD000628', 'BVBD000630', 'BVBD000092'],
-                'Ma_NV.1': ['N0003', 'N0009', 'N0125'],
                 'Ngay_Sinh': ['01/01/1967', '17/09/1975', '11/07/1975'],
                 'Gioi_Tinh': ['Nam', 'Nữ', 'Nam'],
                 'Noi_Sinh': ['Nghệ An', 'Hà Nội', 'Hà Nam'],
@@ -484,25 +490,8 @@ def render_quan_ly_can_bo():
                 'So_CCCD': ['12243422', '1175014697', '1075022616'],
                 'Khoa_Phong': ['Ban Giám đốc', 'Ban Giám đốc', 'Ban Giám đốc'],
                 'Chuc_Vu': ['Chủ tịch HĐQL, Giám đốc', 'Phó Giám đốc', 'Phó Giám đốc'],
-                'Ngach_Vien_Chuc': ['Viên chức A2', 'Viên chức A1', 'Viên chức A1'],
-                'Bac_Luong': ['8/8', '9/9', '9/9'],
-                'He_So_Luong': ['6.78', '4.98', '4.98'],
-                'Ngay_Nang_Luong': ['2025-09-01', '2025-08-01', '2025-09-01'],
-                'Trinh_Do_Giao_Duc': ['12 / 12', '12 / 12', '12 / 12'],
                 'Trinh_Do_Chuyen_Mon': ['Thạc sĩ, Bác sĩ CKII', 'Thạc sĩ kinh tế', 'Thạc sĩ, Bác sĩ CKII'],
-                'Ly_Luan_Chinh_Tri': [None, None, None],
-                'Ngoai_Ngu': [None, None, None],
-                'Tin_Hoc': [None, None, None],
-                'So_CCHN': ['005542/BYT-CCHN', None, '0013785/BYT-CCHN'],
-                'Gio_CME': [None, None, None],
-                'Ngay_Vao_Dang': ['29/10/2004', '15/02/2001', '15/03/2012'],
-                'Ngay_Nhap_Ngu': [None, None, None],
-                'Danh_Hieu_Phong_Tang': [None, None, None],
-                'Khen_Thuong_Ky_Luat': [None, None, None],
-                'Suc_Khoe_Thuong_Binh': [None, None, None],
-                'Loai_HD': ['Không có thời hạn xác định', 'Không có thời hạn xác định', 'Không có thời hạn xác định'],
-                'Ngay_Het_Han_HD': [None, None, None],
-                'Trang_Thai': ['Chính thức', 'Chính thức', 'Chính thức']
+                'Email': ['', '', '']
             })
             
             output_sample = io.BytesIO()
@@ -519,7 +508,17 @@ def render_quan_ly_can_bo():
             
         with col_m2:
             st.markdown("##### 📤 **2. Tải lên file Excel theo mẫu 2C-BNV**")
-            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx) chuẩn 2C-BNV:", type=['xlsx', 'xls'], key="excel_uploader_2c")
+            
+            # Hiển thị thông báo lưu trữ từ session_state nếu có
+            if "upload_success_msg" in st.session_state:
+                st.success(st.session_state["upload_success_msg"])
+                del st.session_state["upload_success_msg"]
+                
+            if "upload_error_msg" in st.session_state:
+                st.error(st.session_state["upload_error_msg"])
+                del st.session_state["upload_error_msg"]
+
+            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx) chuẩn 2C-BNV:", type=['xlsx', 'xls'], key="excel_uploader_2c_v3")
             
             if uploaded_file is not None:
                 try:
@@ -533,10 +532,10 @@ def render_quan_ly_can_bo():
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True, type="primary"):
                         count_inserted = 0
+                        count_updated = 0
                         count_errors = 0
                         error_logs = []
                         
-                        # Chuẩn hóa tên cột file Excel (loại bỏ khoảng trắng, chữ hoa/thường)
                         col_mapping = {c.strip().lower(): c for c in df_up.columns}
                         
                         def find_val(row_item, possible_keys):
@@ -556,20 +555,19 @@ def render_quan_ly_can_bo():
                         with engine.begin() as conn:
                             for idx, row in df_up.iterrows():
                                 try:
-                                    h_val = find_val(row, ['Ho_Ten', 'Họ và Tên', 'Ho Ten'])
+                                    h_val = find_val(row, ['Ho_Ten', 'Họ và Tên', 'Ho Ten', 'hoten'])
                                     if not h_val:
                                         count_errors += 1
                                         error_logs.append(f"Dòng {idx+1}: Thiếu Họ tên.")
                                         continue
                                         
-                                    m_val = find_val(row, ['Ma_NV', 'Mã NV', 'Ma_Can_Bo', 'Mã Cán Bộ']) or f"N{idx+1:04d}"
+                                    m_val = find_val(row, ['Ma_NV', 'Mã NV', 'Ma_Can_Bo', 'Mã Cán Bộ', 'macanbo']) or f"N{idx+1:04d}"
                                     
-                                    # Xử lý ngày sinh linh hoạt
                                     ns_val = None
                                     raw_ns = None
-                                    for date_key in ['Ngay_Sinh', 'Ngày Sinh', 'NgaySinh']:
-                                        if date_key.strip().lower() in col_mapping:
-                                            raw_ns = row[col_mapping[date_key.strip().lower()]]
+                                    for date_key in ['Ngay_Sinh', 'Ngày Sinh', 'NgaySinh', 'ngaysinh']:
+                                        if date_key.lower() in col_mapping:
+                                            raw_ns = row[col_mapping[date_key.lower()]]
                                             break
                                             
                                     if pd.notna(raw_ns):
@@ -577,50 +575,55 @@ def render_quan_ly_can_bo():
                                             if isinstance(raw_ns, datetime):
                                                 ns_val = raw_ns.date()
                                             else:
-                                                ns_val = pd.to_datetime(raw_ns, dayfirst=True).date()
+                                                parsed_date = pd.to_datetime(raw_ns, errors='coerce', dayfirst=True)
+                                                if pd.notna(parsed_date):
+                                                    ns_val = parsed_date.date()
                                         except Exception:
                                             ns_val = None
                                             
-                                    cccd_val = find_val(row, ['So_CCCD', 'Số CCCD', 'CCCD'])
-                                    chuc_vu_val = find_val(row, ['Chuc_Vu', 'Chức Vụ', 'Chuc_Danh', 'Chức danh'])
-                                    khoa_phong_val = find_val(row, ['Khoa_Phong', 'Khoa / Phòng', 'KhoaPhong'])
-                                    trinh_do_val = find_val(row, ['Trinh_Do_Chuyen_Mon', 'Trình Độ Chuyên Môn', 'Trinh_Do', 'Trình độ'])
-                                    sdt_val = find_val(row, ['Dien_Thoai', 'Điện Thoại', 'So_Dien_Thoai', 'Số điện thoại'])
-                                    email_val = find_val(row, ['Email'])
+                                    cccd_val = find_val(row, ['So_CCCD', 'Số CCCD', 'CCCD', 'socccd'])
+                                    chuc_vu_val = find_val(row, ['Chuc_Vu', 'Chức Vụ', 'Chuc_Danh', 'Chức danh', 'chucvu'])
+                                    khoa_phong_val = find_val(row, ['Khoa_Phong', 'Khoa / Phòng', 'KhoaPhong', 'khoaphong'])
+                                    trinh_do_val = find_val(row, ['Trinh_Do_Chuyen_Mon', 'Trình Độ Chuyên Môn', 'Trinh_Do', 'Trình độ', 'trinhdo'])
+                                    sdt_val = find_val(row, ['Dien_Thoai', 'Điện Thoại', 'So_Dien_thoai', 'Số điện thoại', 'dienthoai'])
+                                    email_val = find_val(row, ['Email', 'email'])
                                     
-                                    conn.execute(text("""
+                                    # Sử dụng UPSERT: Nếu ma_can_bo đã tồn tại thì CẬP NHẬT, chưa có thì THÊM MỚI
+                                    result = conn.execute(text("""
                                         INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                         VALUES (:m, :h, :ns, :cccd, :cv, :kp, :td, :sdt, :email)
+                                        ON CONFLICT (ma_can_bo) 
+                                        DO UPDATE SET 
+                                            ho_ten = EXCLUDED.ho_ten,
+                                            ngay_sinh = EXCLUDED.ngay_sinh,
+                                            so_cccd = EXCLUDED.so_cccd,
+                                            chuc_danh = EXCLUDED.chuc_danh,
+                                            khoa_phong = EXCLUDED.khoa_phong,
+                                            trinh_do = EXCLUDED.trinh_do,
+                                            so_dien_thoai = EXCLUDED.so_dien_thoai,
+                                            email = EXCLUDED.email
                                     """), {
-                                        "m": m_val, 
-                                        "h": h_val, 
-                                        "ns": ns_val, 
-                                        "cccd": cccd_val, 
-                                        "cv": chuc_vu_val, 
-                                        "kp": khoa_phong_val, 
-                                        "td": trinh_do_val, 
-                                        "sdt": sdt_val, 
-                                        "email": email_val
+                                        "m": m_val, "h": h_val, "ns": ns_val, "cccd": cccd_val, 
+                                        "cv": chuc_vu_val, "kp": khoa_phong_val, "td": trinh_do_val, 
+                                        "sdt": sdt_val, "email": email_val
                                     })
                                     count_inserted += 1
                                 except Exception as row_ex:
                                     count_errors += 1
-                                    error_logs.append(f"Dòng {idx+1}: {str(row_ex)}")
-                        
-                        # Hiển thị thông báo kết quả rõ ràng sau khi upload xong
+                                    error_logs.append(f"Dòng {idx+1} lỗi: {str(row_ex)}")
+
                         st.cache_data.clear()
+                        
                         if count_inserted > 0:
-                            st.success(f"🎉 **Đã upload thành công {count_inserted} nhân sự** vào Cơ sở dữ liệu!")
+                            msg = f"🎉 **Xử lý thành công!** Đã cập nhật / thêm mới **{count_inserted}** bản ghi nhân sự vào Cơ sở dữ liệu."
                             if count_errors > 0:
-                                st.warning(f"⚠️ Có {count_errors} dòng bị bỏ qua do thiếu thông tin hoặc lỗi định dạng.")
+                                msg += f" (Bỏ qua {count_errors} dòng lỗi)."
+                            st.session_state["upload_success_msg"] = msg
                             st.balloons()
                             st.rerun()
                         else:
-                            st.error(f"❌ Không thể nhập dữ liệu. Có {count_errors} lỗi xảy ra.")
-                            if error_logs:
-                                with st.expander("🔍 Xem chi tiết lỗi"):
-                                    for log in error_logs[:15]:
-                                        st.write(log)
+                            st.session_state["upload_error_msg"] = "❌ Không có dữ liệu nào được nạp vào CSDL."
+                            st.rerun()
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
 
