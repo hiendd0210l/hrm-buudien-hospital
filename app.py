@@ -285,6 +285,8 @@ def render_quan_ly_can_bo():
         
         if col_t2.button("🔄 Tải lại dữ liệu", use_container_width=True):
             st.cache_data.clear()
+            if "select_target_del" in st.session_state:
+                del st.session_state["select_target_del"]
             st.toast("🔄 Đã làm mới dữ liệu từ CSDL thành công!")
             st.rerun()
 
@@ -294,6 +296,8 @@ def render_quan_ly_can_bo():
                     conn.execute(text("DELETE FROM can_bo;"))
                     conn.commit()
                 st.cache_data.clear()
+                if "select_target_del" in st.session_state:
+                    del st.session_state["select_target_del"]
                 st.success("Đã làm sạch toàn bộ CSDL!")
                 st.rerun()
             except Exception as e_clean:
@@ -313,35 +317,48 @@ def render_quan_ly_can_bo():
             st.markdown("##### 🗑️ **Xóa dữ liệu cá nhân**")
             col_del1, col_del2, col_del3 = st.columns([2.5, 1, 1])
             
-            options_del = {"-- Chọn nhân sự để xóa --": None}
+            # Tạo danh sách lựa chọn với phần tử đầu tiên là thông báo hướng dẫn
+            options_list = ["-- Chọn nhân sự muốn xóa --"]
+            options_map = {"-- Chọn nhân sự muốn xóa --": None}
+            
             for _, row in df.iterrows():
                 mcb = str(row['ma_can_bo']) if pd.notna(row['ma_can_bo']) else "N/A"
                 hoten = str(row['ho_ten']) if pd.notna(row['ho_ten']) else "N/A"
                 khoa = str(row['khoa_phong']) if pd.notna(row['khoa_phong']) else "Chưa phân khoa"
                 label = f"{mcb} - {hoten} ({khoa})"
-                options_del[label] = row['id']
+                options_list.append(label)
+                options_map[label] = row['id']
                 
-            # Đặt key rõ ràng cho selectbox để quản lý state dễ dàng
+            # Sử dụng index quản lý trực tiếp qua session_state để có thể reset về 0
+            if "del_index" not in st.session_state:
+                st.session_state["del_index"] = 0
+
             selected_del_label = col_del1.selectbox(
                 "Chọn nhân sự muốn xóa:", 
-                list(options_del.keys()), 
-                key="select_target_del"
+                options_list, 
+                index=st.session_state["del_index"],
+                key="select_target_del",
+                on_change=lambda: st.session_state.update({"del_index": options_list.index(st.session_state["select_target_del"])}) if "select_target_del" in st.session_state else None
             )
-            target_id = options_del[selected_del_label]
+            
+            target_id = options_map.get(selected_del_label, None)
 
             if col_del2.button("🗑️ Xóa nhân sự", use_container_width=True):
                 if target_id is None:
-                    st.warning("⚠️ Bạn chưa chọn nhân sự nào!")
+                    st.warning("⚠️ Vui lòng chọn một nhân sự cụ thể trong danh sách để xóa!")
                 else:
                     with engine.connect() as conn:
                         conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
                         conn.commit()
                     st.cache_data.clear()
+                    st.session_state["del_index"] = 0
+                    if "select_target_del" in st.session_state:
+                        del st.session_state["select_target_del"]
                     st.success(f"Đã xóa thành công [{selected_del_label}]!")
                     st.rerun()
 
-            # Sửa lại logic nút Hủy thao tác hoạt động chính xác
             if col_del3.button("❌ Hủy thao tác", use_container_width=True):
+                st.session_state["del_index"] = 0
                 if "select_target_del" in st.session_state:
                     del st.session_state["select_target_del"]
                 st.toast("Đã hủy thao tác chọn nhân sự.")
