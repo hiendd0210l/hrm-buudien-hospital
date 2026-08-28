@@ -4,7 +4,7 @@ import plotly.express as px
 from sqlalchemy import create_engine, text
 
 # ---------------------------------------------------------
-# 1. CẤU HÌNH TRANG & CSS GIỐNG HỆT BẢN THIẾT KẾ GỐC
+# 1. CẤU HÌNH TRANG & CSS
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="BỆNH VIỆN BƯU ĐIỆN - Hệ thống Quản trị Nhân sự & Điều hành",
@@ -15,12 +15,10 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Nền trắng chuẩn theo ảnh thiết kế */
     .stApp {
         background-color: #fcfcfc !important;
     }
 
-    /* Tiêu đề chính BỆNH VIỆN BƯU ĐIỆN */
     .hospital-title {
         color: #0068b5;
         font-weight: 800;
@@ -31,7 +29,6 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
 
-    /* Dòng phụ đề bên dưới tiêu đề */
     .hospital-subtitle {
         color: #666666;
         font-size: 13px;
@@ -39,7 +36,6 @@ st.markdown("""
         margin-bottom: 25px;
     }
 
-    /* Khung Card bao quanh ô đăng nhập */
     .login-card {
         background-color: #f8fafc;
         border: 1px solid #e2e8f0;
@@ -48,14 +44,12 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0,0,0,0.03);
     }
 
-    /* Label ô nhập liệu */
     .stTextInput > label {
         color: #475569 !important;
         font-size: 13px !important;
         font-weight: 500 !important;
     }
 
-    /* Input text box */
     .stTextInput > div > div > input {
         border-radius: 6px !important;
         border: 1px solid #cbd5e1 !important;
@@ -63,7 +57,6 @@ st.markdown("""
         height: 40px !important;
     }
 
-    /* Style cho cả 2 nút Đăng nhập và Thoát màu xanh lam chuẩn thiết kế */
     div.stButton > button[key="btn_login"], 
     div.stButton > button[key="btn_exit"] {
         background-color: #0077ba !important;
@@ -81,7 +74,6 @@ st.markdown("""
         background-color: #005c91 !important;
     }
 
-    /* CSS Giao diện Dashboard */
     .card-box {
         padding: 20px;
         border-radius: 10px;
@@ -128,12 +120,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Khởi tạo session lưu đăng nhập
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON
+# 2. KẾT NỐI DATABASE
 # ---------------------------------------------------------
 @st.cache_resource
 def get_db_engine():
@@ -148,127 +139,70 @@ def get_db_engine():
             db_url = f"postgresql://{pg['user']}:{pg['password']}@{pg['host']}:{pg['port']}/{pg['database']}?sslmode=require"
             return create_engine(db_url, pool_pre_ping=True)
         return None
-    except Exception as e:
-        st.error(f"Lỗi kết nối CSDL: {e}")
+    except Exception:
         return None
 
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP CHUẨN MẪU THIẾT KẾ GỐC
+# 3. TRANG ĐĂNG NHẬP (CHUẨN LỀ & LOGO TRÒN CHÍNH XÁC)
 # ---------------------------------------------------------
-# def login_screen():
-    st.markdown("""
-        <style>
-            .main .block-container {
-                padding-top: 3rem;
-                padding-bottom: 2rem;
-            }
-            .logo-container {
-                text-align: center;
-                margin-bottom: 15px;
-            }
-            .hospital-logo-img {
-                width: 130px;
-                height: 130px;
-                object-fit: contain;
-                margin-bottom: 10px;
-                filter: drop-shadow(0px 4px 8px rgba(0, 0, 0, 0.12));
-            }
-            .login-title {
-                text-align: center;
-                color: #0056b3;
-                font-size: 24px;
-                font-weight: 800;
-                margin-bottom: 4px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-            .login-subtitle {
-                text-align: center;
-                color: #64748b;
-                font-size: 14px;
-                margin-bottom: 20px;
-                font-weight: 500;
-            }
+def render_login():
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    col_l, col_center, col_r = st.columns([1, 1.6, 1])
 
-            [data-testid="stForm"] {
-                background: linear-gradient(145deg, #ffffff, #f8fafc);
-                padding: 30px 25px;
-                border-radius: 16px;
-                box-shadow: 0 10px 25px rgba(13, 71, 161, 0.08);
-                border: 1px solid #e2e8f0;
-            }
-            [data-testid="stForm"] label {
-                color: #1e293b !important;
-                font-weight: 600 !important;
-                font-size: 14px !important;
-            }
-            [data-testid="stForm"] input {
-                background-color: #ffffff !important;
-                border: 1.5px solid #cbd5e1 !important;
-                border-radius: 8px !important;
-                color: #0f172a !important;
-                padding: 10px 14px !important;
-            }
+    with col_center:
+        st.markdown("""
+<div style="text-align: center; margin-bottom: 15px;">
+    <svg width="120" height="120" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="100" cy="100" r="95" fill="#0066b2"/>
+        <circle cx="100" cy="100" r="72" fill="#ffffff"/>
+        <path id="text-path" d="M 35 100 A 65 65 0 0 1 165 100" fill="none"/>
+        <text fill="#0066b2" font-size="13" font-weight="bold" font-family="Arial">
+            <textPath href="#text-path" startOffset="50%" text-anchor="middle">
+                BỆNH VIỆN BƯU ĐIỆN
+            </textPath>
+        </text>
+        <polygon points="32,95 35,102 28,98 36,98 29,102" fill="#ffffff"/>
+        <polygon points="168,95 171,102 164,98 172,98 165,102" fill="#ffffff"/>
+        <rect x="88" y="55" width="24" height="60" fill="#e51c23" rx="2"/>
+        <rect x="70" y="73" width="60" height="24" fill="#e51c23" rx="2"/>
+        <path d="M 60 115 C 75 135, 100 138, 100 138 C 100 138, 125 135, 140 115 C 120 128, 100 128, 100 128 C 100 128, 80 128, 60 115 Z" fill="#4caf50"/>
+        <path d="M 40 130 Q 100 165 160 130 A 95 95 0 0 1 40 130 Z" fill="#0066b2"/>
+        <text x="100" y="162" fill="#ffffff" font-size="18" font-weight="900" font-family="Arial" text-anchor="middle">VNPT</text>
+    </svg>
+</div>
+""", unsafe_allow_html=True)
 
-            div[data-testid="stFormSubmitButton"] > button {
-                background: linear-gradient(135deg, #0284c7, #0369a1) !important;
-                color: white !important;
-                font-weight: 700 !important;
-                border: none !important;
-                border-radius: 8px !important;
-                padding: 10px 0px !important;
-                transition: all 0.2s ease !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+        st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
+        st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col2:
-        st.markdown(f"""
-            <div class="logo-container">
-                <img class="hospital-logo-img" src="{LOGO_BASE64}" alt="Logo Bệnh viện Bưu điện">
-                <div class="login-title">BỆNH VIỆN BƯU ĐIỆN</div>
-                <div class="login-subtitle">Hệ thống Quản trị Nhân sự & Điều hành</div>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
         
-        with st.form("login_form"):
-            # Đã ẩn tên đăng nhập và mật khẩu mặc định
-            username = st.text_input("Tên đăng nhập / Username:", value="", placeholder="Nhập tên đăng nhập...")
-            password = st.text_input("Mật khẩu / Password:", type="password", value="", placeholder="Nhập mật khẩu...")
-            st.markdown("<br>", unsafe_allow_html=True)
+        username = st.text_input("Tên đăng nhập / Username:", placeholder="Nhập tên đăng nhập...")
+        password = st.text_input("Mật khẩu / Password:", type="password", placeholder="Nhập mật khẩu...")
 
-            btn_col1, btn_col2 = st.columns(2)
-            with btn_col1:
-                submit_button = st.form_submit_button("🔑 Đăng nhập", use_container_width=True)
-            with btn_col2:
-                exit_in_form = st.form_submit_button("❌ Thoát", use_container_width=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        b_col1, b_col2 = st.columns(2)
 
-            if submit_button:
+        with b_col1:
+            if st.button("🔑 Đăng nhập", key="btn_login", use_container_width=True):
                 if username == "admin" and password == "admin123":
-                    st.session_state.logged_in = True
-                    st.session_state.user_info = {
-                        "name": "admin",
-                        "fullname": "Đoàn Danh Hiển",
-                        "role": "Quản trị viên Hệ thống — Bệnh viện Bưu điện",
-                        "avatar_path": "doan_danh_hien.jpg" if os.path.exists("doan_danh_hien.jpg") else "assets/doan_danh_hien.jpg"
-                    }
+                    st.session_state['logged_in'] = True
                     st.success("Đăng nhập thành công!")
                     st.rerun()
                 else:
-                    st.error("❌ Tên đăng nhập hoặc mật khẩu không chính xác!")
+                    st.error("❌ Tên đăng nhập hoặc mật khẩu chưa đúng!")
 
-            if exit_in_form:
-                st.info("Cảm ơn bạn đã sử dụng hệ thống!")
-                st.stop()
+        with b_col2:
+            if st.button("✕ Thoát", key="btn_exit", use_container_width=True):
+                st.info("Đã đóng phiên đăng nhập.")
 
-if not st.session_state.logged_in:
-    login_screen()
-    st.stop()
+        st.markdown("</div>", unsafe_allow_html=True)
+
 # ---------------------------------------------------------
-# 4. GIAO DIỆN CHÍNH DASHBOARD
+# 4. GIAO DIỆN DASHBOARD
 # ---------------------------------------------------------
 def render_dashboard():
     st.sidebar.title("DANH MỤC CHỨC NĂNG")
@@ -391,7 +325,7 @@ def render_dashboard():
         st.info(f"⚙️ Chức năng **{menu}** đang được đồng bộ dữ liệu.")
 
 # ---------------------------------------------------------
-# 5. BẮT ĐẦU ĐIỀU HƯỚNG
+# 5. CHẠY ỨNG DỤNG
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     render_login()
