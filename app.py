@@ -6,7 +6,7 @@ import plotly.express as px
 from sqlalchemy import create_engine, text
 
 # ---------------------------------------------------------
-# 1. CẤU HÌNH TRANG & CSS GIAO DIỆN SẮC NÉT
+# 1. CẤU HÌNH TRANG & CSS GIAO DIỆN CHUẨN
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="BỆNH VIỆN BƯU ĐIỆN - Hệ thống Quản trị Nhân sự & Điều hành",
@@ -15,18 +15,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# CSS triệt tiêu ô trắng rỗng và tô màu xanh dương đậm cho nút
 st.markdown("""
 <style>
     .stApp {
         background-color: #f1f5f9 !important;
     }
 
+    /* TIÊU ĐỀ TRANG */
     .hospital-title {
         color: #0066b2 !important;
         font-weight: 800 !important;
         font-size: 26px !important;
         text-align: center;
-        margin-top: 8px;
+        margin-top: 10px;
         margin-bottom: 2px;
         letter-spacing: 0.5px;
     }
@@ -36,19 +38,10 @@ st.markdown("""
         font-size: 14px !important;
         font-weight: 600 !important;
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 25px;
     }
 
-    .login-card {
-        background-color: #ffffff !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 12px !important;
-        padding: 28px 25px !important;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-        max-width: 460px;
-        margin: 0 auto;
-    }
-
+    /* NHẬP LIỆU */
     .stTextInput > label {
         color: #0f172a !important;
         font-size: 14px !important;
@@ -64,53 +57,33 @@ st.markdown("""
         font-size: 15px !important;
         height: 42px !important;
     }
-    .stTextInput > div > div > input:focus {
-        border-color: #0066b2 !important;
-        box-shadow: 0 0 0 3px rgba(0, 102, 178, 0.2) !important;
-    }
 
-    /* NÚT ĐĂNG NHẬP MÀU XANH DƯƠNG - CHỮ ĐẬM */
-    div.stButton > button[key="btn_login"] {
+    /* TẤT CẢ NÚT BẤM CỦA TRANG ĐĂNG NHẬP (ĐĂNG NHẬP & THOÁT): TÔ MÀU XANH DƯƠNG + CHỮ ĐẬM */
+    .stButton > button {
         background: linear-gradient(180deg, #0080e5 0%, #0056a3 100%) !important;
         color: #ffffff !important;
         font-weight: 800 !important;
         font-size: 15px !important;
         border-radius: 8px !important;
         border: 1px solid #004080 !important;
-        height: 44px !important;
-        box-shadow: 0 4px 0px #003366, 0 6px 10px rgba(0,0,0,0.15) !important;
-        transition: all 0.1s ease !important;
-        text-shadow: 0px 1px 2px rgba(0,0,0,0.3);
+        height: 45px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.15) !important;
+        transition: all 0.2s ease !important;
     }
-    div.stButton > button[key="btn_login"]:hover {
-        background: linear-gradient(180deg, #0090ff 0%, #0062b8 100%) !important;
-    }
-    div.stButton > button[key="btn_login"]:active {
-        box-shadow: 0 2px 0px #003366, 0 3px 5px rgba(0,0,0,0.2) !important;
-        transform: translateY(2px) !important;
-    }
-
-    /* NÚT THOÁT MÀU XANH DƯƠNG NHẸ/TRUNG - CHỮ ĐẬM */
-    div.stButton > button[key="btn_exit"] {
-        background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%) !important;
+    
+    .stButton > button p {
         color: #ffffff !important;
         font-weight: 800 !important;
         font-size: 15px !important;
-        border-radius: 8px !important;
-        border: 1px solid #1e40af !important;
-        height: 44px !important;
-        box-shadow: 0 4px 0px #1e3a8a, 0 6px 10px rgba(0,0,0,0.15) !important;
-        transition: all 0.1s ease !important;
-        text-shadow: 0px 1px 2px rgba(0,0,0,0.3);
-    }
-    div.stButton > button[key="btn_exit"]:hover {
-        background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%) !important;
-    }
-    div.stButton > button[key="btn_exit"]:active {
-        box-shadow: 0 2px 0px #1e3a8a, 0 3px 5px rgba(0,0,0,0.2) !important;
-        transform: translateY(2px) !important;
     }
 
+    .stButton > button:hover {
+        background: linear-gradient(180deg, #0090ff 0%, #0062b8 100%) !important;
+        border-color: #003366 !important;
+        transform: translateY(-1px);
+    }
+
+    /* DASHBOARD CARD STYLES */
     .card-box {
         padding: 20px;
         border-radius: 10px;
@@ -162,7 +135,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE
+# 2. KẾT NỐI DATABASE NEON
 # ---------------------------------------------------------
 @st.cache_resource
 def get_db_engine():
@@ -183,18 +156,15 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (ĐÃ XÓA Ô TRẮNG THỪA & CHỈNH NÚT XANH DƯƠNG)
+# 3. TRANG ĐĂNG NHẬP (SẠCH SẼ, KHÔNG Ô TRẮNG THỪA)
 # ---------------------------------------------------------
 def render_login():
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
     
     col_l, col_center, col_r = st.columns([1.5, 2.0, 1.5])
 
     with col_center:
-        # Gom tất cả vào bên trong khung login-card để không bị ô trắng thừa
-        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
-
-        # 1. HÌNH LOGO BỆNH VIỆN BƯU ĐIỆN
+        # Hiển thị Logo
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png") if '__file__' in globals() else "logo.png"
 
         if os.path.exists(logo_path):
@@ -202,7 +172,7 @@ def render_login():
                 encoded_img = base64.b64encode(f.read()).decode("utf-8")
             st.markdown(
                 f"""
-                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
                     <img src="data:image/png;base64,{encoded_img}" width="180" style="object-fit: contain;">
                 </div>
                 """,
@@ -211,17 +181,17 @@ def render_login():
         else:
             st.image("logo.png", width=180)
 
-        # 2. TIÊU ĐỀ
+        # Tiêu đề
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
         st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
 
-        # 3. Ô NHẬP LIỆU
+        # Ô nhập liệu
         username = st.text_input("Tên đăng nhập / Username:", placeholder="Nhập tên đăng nhập...")
         password = st.text_input("Mật khẩu / Password:", type="password", placeholder="Nhập mật khẩu...")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 4. HÀNG NÚT BẤM (MÀU XANH DƯƠNG, CHỮ IN ĐẬM)
+        # Hàng nút nhấn màu xanh dương
         b_col1, b_col2 = st.columns(2)
 
         with b_col1:
@@ -237,10 +207,8 @@ def render_login():
             if st.button("✕ Thoát", key="btn_exit", use_container_width=True):
                 st.info("Đã đóng phiên đăng nhập.")
 
-        st.markdown("</div>", unsafe_allow_html=True)
-
 # ---------------------------------------------------------
-# 4. GIAO DIỆN DASHBOARD
+# 4. GIAO DIỆN DASHBOARD CHÍNH
 # ---------------------------------------------------------
 def render_dashboard():
     st.sidebar.title("DANH MỤC CHỨC NĂNG")
@@ -363,7 +331,7 @@ def render_dashboard():
         st.info(f"⚙️ Chức năng **{menu}** đang được đồng bộ dữ liệu.")
 
 # ---------------------------------------------------------
-# 5. CHẠY ỨNG DỤNG
+# 5. BẮT ĐẦU CHẠY APP
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     render_login()
