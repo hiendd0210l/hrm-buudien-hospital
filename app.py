@@ -1,3 +1,5 @@
+import os
+import base64
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -47,7 +49,6 @@ st.markdown("""
         margin: 0 auto;
     }
 
-    /* Nhãn ô nhập liệu đậm, rõ nét */
     .stTextInput > label {
         color: #0f172a !important;
         font-size: 14px !important;
@@ -55,7 +56,6 @@ st.markdown("""
         margin-bottom: 4px !important;
     }
 
-    /* Viền ô nhập liệu rõ ràng */
     .stTextInput > div > div > input {
         border-radius: 6px !important;
         border: 1.5px solid #94a3b8 !important;
@@ -69,9 +69,7 @@ st.markdown("""
         box-shadow: 0 0 0 3px rgba(0, 102, 178, 0.2) !important;
     }
 
-    /* -----------------------------------------------------
-       NÚT ĐĂNG NHẬP 3D (XANH LAM DỐC)
-       ----------------------------------------------------- */
+    /* NÚT ĐĂNG NHẬP 3D */
     div.stButton > button[key="btn_login"] {
         background: linear-gradient(180deg, #0080e5 0%, #0056a3 100%) !important;
         color: #ffffff !important;
@@ -92,9 +90,7 @@ st.markdown("""
         transform: translateY(3px) !important;
     }
 
-    /* -----------------------------------------------------
-       NÚT THOÁT 3D (ĐỎ DỐC)
-       ----------------------------------------------------- */
+    /* NÚT THOÁT 3D */
     div.stButton > button[key="btn_exit"] {
         background: linear-gradient(180deg, #f87171 0%, #dc2626 100%) !important;
         color: #ffffff !important;
@@ -115,7 +111,6 @@ st.markdown("""
         transform: translateY(3px) !important;
     }
 
-    /* Dashboard Styles */
     .card-box {
         padding: 20px;
         border-radius: 10px;
@@ -188,7 +183,7 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (LẤY LOGO.PNG CHUẨN VÀ NÚT 3D)
+# 3. TRANG ĐĂNG NHẬP
 # ---------------------------------------------------------
 def render_login():
     st.markdown("<br>", unsafe_allow_html=True)
@@ -196,7 +191,6 @@ def render_login():
     col_l, col_center, col_r = st.columns([1.5, 2.0, 1.5])
 
     with col_center:
-        # Đọc file logo.png từ GitHub repository
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png") if '__file__' in globals() else "logo.png"
 
         if os.path.exists(logo_path):
@@ -211,7 +205,6 @@ def render_login():
                 unsafe_allow_html=True
             )
         else:
-            # Dự phòng hiển thị bằng st.image nếu không cần mã hóa
             st.markdown('<div style="display: flex; justify-content: center; align-items: center; margin-bottom: 15px;">', unsafe_allow_html=True)
             st.image("logo.png", width=200)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -241,7 +234,7 @@ def render_login():
                 st.info("Đã đóng phiên đăng nhập.")
 
         st.markdown("</div>", unsafe_allow_html=True)
-        
+
 # ---------------------------------------------------------
 # 4. GIAO DIỆN DASHBOARD
 # ---------------------------------------------------------
