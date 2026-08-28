@@ -4,7 +4,7 @@ import plotly.express as px
 from sqlalchemy import create_engine, text
 
 # ---------------------------------------------------------
-# 1. CẤU HÌNH TRANG & CSS
+# 1. CẤU HÌNH TRANG & CSS NỔI BẬT & THU GỌN FORM
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="BỆNH VIỆN BƯU ĐIỆN - Hệ thống Quản trị Nhân sự & Điều hành",
@@ -15,65 +15,95 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    /* Nền trang xám rất nhạt để tôn form đăng nhập */
     .stApp {
-        background-color: #fcfcfc !important;
+        background-color: #f1f5f9 !important;
     }
 
+    /* Tiêu đề chính BỆNH VIỆN BƯU ĐIỆN */
     .hospital-title {
-        color: #0068b5;
-        font-weight: 800;
-        font-size: 24px;
+        color: #005696 !important;
+        font-weight: 800 !important;
+        font-size: 26px !important;
         text-align: center;
         margin-top: 10px;
         margin-bottom: 2px;
         letter-spacing: 0.5px;
     }
 
+    /* Dòng phụ đề */
     .hospital-subtitle {
-        color: #666666;
-        font-size: 13px;
-        text-align: center;
-        margin-bottom: 25px;
-    }
-
-    .login-card {
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 25px 30px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-    }
-
-    .stTextInput > label {
         color: #475569 !important;
-        font-size: 13px !important;
-        font-weight: 500 !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        text-align: center;
+        margin-bottom: 20px;
     }
 
+    /* Khung Form Đăng Nhập: Thu gọn chiều ngang & Tô màu đậm nét */
+    .login-card {
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 12px !important;
+        padding: 30px 25px !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+        max-width: 480px;
+        margin: 0 auto;
+    }
+
+    /* Nhãn Ô Nhập (Label) Đậm Nét */
+    .stTextInput > label {
+        color: #0f172a !important;
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        margin-bottom: 6px !important;
+    }
+
+    /* Khung Ô Nhập Liệu Rõ Ràng */
     .stTextInput > div > div > input {
         border-radius: 6px !important;
-        border: 1px solid #cbd5e1 !important;
+        border: 1.5px solid #94a3b8 !important;
         background-color: #ffffff !important;
-        height: 40px !important;
+        color: #0f172a !important;
+        font-size: 15px !important;
+        height: 44px !important;
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: #0077ba !important;
+        box-shadow: 0 0 0 3px rgba(0, 119, 186, 0.2) !important;
     }
 
-    div.stButton > button[key="btn_login"], 
-    div.stButton > button[key="btn_exit"] {
+    /* Nút Đăng nhập Màu Xanh Lam Đậm */
+    div.stButton > button[key="btn_login"] {
         background-color: #0077ba !important;
         color: #ffffff !important;
-        font-weight: 600 !important;
-        font-size: 14px !important;
+        font-weight: 700 !important;
+        font-size: 15px !important;
         border-radius: 6px !important;
         border: none !important;
-        height: 42px !important;
-        transition: background-color 0.2s ease !important;
+        height: 44px !important;
+        box-shadow: 0 2px 4px rgba(0,119,186,0.3) !important;
     }
-
-    div.stButton > button[key="btn_login"]:hover, 
-    div.stButton > button[key="btn_exit"]:hover {
+    div.stButton > button[key="btn_login"]:hover {
         background-color: #005c91 !important;
     }
 
+    /* Nút Thoát Màu Đỏ Nổi Bật */
+    div.stButton > button[key="btn_exit"] {
+        background-color: #ef4444 !important;
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        font-size: 15px !important;
+        border-radius: 6px !important;
+        border: none !important;
+        height: 44px !important;
+        box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3) !important;
+    }
+    div.stButton > button[key="btn_exit"]:hover {
+        background-color: #dc2626 !important;
+    }
+
+    /* CSS Giao diện Dashboard */
     .card-box {
         padding: 20px;
         border-radius: 10px;
@@ -111,11 +141,12 @@ st.markdown("""
     .badge-green { border-color: #00b074; color: #00b074; }
 
     .alert-item {
-        background-color: #f8f9fa;
+        background-color: #ffffff;
         padding: 12px 15px;
         border-radius: 8px;
         margin-bottom: 10px;
         border-left: 4px solid #00b074;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -145,17 +176,19 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (CHUẨN LỀ & LOGO TRÒN CHÍNH XÁC)
+# 3. TRANG ĐĂNG NHẬP (THU GỌN & RÕ NÉT)
 # ---------------------------------------------------------
 def render_login():
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     
-    col_l, col_center, col_r = st.columns([1, 1.6, 1])
+    # Căn giữa và thu hẹp tỷ lệ cột (1.8 - 1.4 - 1.8)
+    col_l, col_center, col_r = st.columns([1.8, 1.4, 1.8])
 
     with col_center:
+        # Logo VNPT Bệnh viện Bưu điện vẽ SVG sắc nét
         st.markdown("""
 <div style="text-align: center; margin-bottom: 15px;">
-    <svg width="120" height="120" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <svg width="110" height="110" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
         <circle cx="100" cy="100" r="95" fill="#0066b2"/>
         <circle cx="100" cy="100" r="72" fill="#ffffff"/>
         <path id="text-path" d="M 35 100 A 65 65 0 0 1 165 100" fill="none"/>
