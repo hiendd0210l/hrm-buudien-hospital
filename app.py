@@ -322,7 +322,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
     
-  # TAB 1: DANH SÁCH & XÓA (HOÀN THIỆN CHỨC NĂNG HỦY THAO TÁC)
+# TAB 1: DANH SÁCH & XÓA (ĐÃ KHẮC PHỤC TRIỆT ĐỂ VIỆC RESET SELECTBOX)
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -395,20 +395,17 @@ def render_quan_ly_can_bo():
                 options_del.append(label)
                 mapping_del[label] = row['id']
             
-            # Quản lý chỉ số index của selectbox thông qua session_state để có thể ép về 0 khi hủy
-            if "del_box_index" not in st.session_state:
-                st.session_state["del_box_index"] = 0
+            # Xử lý xóa state của selectbox nếu lệnh hủy được kích hoạt
+            if st.session_state.get("reset_selectbox_flag", False):
+                if "select_del_widget" in st.session_state:
+                    del st.session_state["select_del_widget"]
+                st.session_state["reset_selectbox_flag"] = False
 
             selected_del_label = col_del1.selectbox(
                 "Chọn nhân sự muốn xóa:", 
                 options_del, 
-                index=st.session_state["del_box_index"], 
                 key="select_del_widget"
             )
-            
-            # Đồng bộ lại index nếu người dùng chọn thủ công trên giao diện
-            current_selected_idx = options_del.index(selected_del_label) if selected_del_label in options_del else 0
-            st.session_state["del_box_index"] = current_selected_idx
             
             target_id = mapping_del.get(selected_del_label, None)
             
@@ -419,12 +416,12 @@ def render_quan_ly_can_bo():
                     with engine.begin() as conn:
                         conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
                     st.cache_data.clear()
-                    st.session_state["del_box_index"] = 0  # Reset về 0 sau khi xóa
+                    st.session_state["reset_selectbox_flag"] = True
                     st.success(f"Đã xóa thành công [{selected_del_label}]!")
                     st.rerun()
                     
             if col_del3.button("❌ Hủy thao tác", use_container_width=True):
-                st.session_state["del_box_index"] = 0  # Ép index quay về phần tử đầu tiên (ẩn tên nhân sự)
+                st.session_state["reset_selectbox_flag"] = True  # Bật cờ yêu cầu xóa state cũ
                 st.toast("Đã hủy thao tác chọn nhân sự.")
                 st.rerun()
 
