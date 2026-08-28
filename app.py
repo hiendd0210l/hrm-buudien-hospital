@@ -91,14 +91,14 @@ if 'db_initialized' not in st.session_state:
     st.session_state['db_initialized'] = False
 
 # ---------------------------------------------------------
-# 2. HÀM BỔ TRỢ CHUẨN HÓA TIẾNG VIỆT & DATABASE NEON
+# 2. HÀM CHUẨN HÓA TIẾNG VIỆT & TRUY VẤN DATABASE
 # ---------------------------------------------------------
 def remove_vietnamese_accent(text_str):
     if not isinstance(text_str, str):
         return ""
     text_str = unicodedata.normalize('NFD', text_str)
     text_str = ''.join(c for c in text_str if unicodedata.category(c) != 'MN')
-    return text_str.replace('đ', 'd').replace('Đ', 'D').lower().replace(" ", "").replace("_", "").replace("-", "")
+    return text_str.replace('đ', 'd').replace('Đ', 'D').lower().replace(" ", "").replace("_", "").replace("-", "").replace("/", "")
 
 @st.cache_resource
 def get_db_engine():
@@ -145,6 +145,7 @@ def init_db_structure():
 
 init_db_structure()
 
+@st.cache_data(ttl=5)
 def load_data_from_db():
     if not engine:
         return pd.DataFrame()
@@ -266,7 +267,7 @@ def render_dashboard_home():
         st.plotly_chart(fig_donut, use_container_width=True)
 
 # ---------------------------------------------------------
-# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (ĐÃ SỬA LỖI MAPPING EXCEL)
+# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (SỬA LỖI TẢI LẠI, NÚT HỦY & EXCEL)
 # ---------------------------------------------------------
 def render_quan_ly_can_bo():
     st.markdown("---")
@@ -291,9 +292,20 @@ def render_quan_ly_can_bo():
 
     # TAB 1: DANH SÁCH & XÓA CÁ NHÂN
     with tab1:
-        col_t1, col_t2 = st.columns([4, 1])
+        col_t1, col_t2, col_t3 = st.columns([3, 1, 1])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
-        if col_t2.button("🔄 Tải lại dữ liệu"):
+        
+        if col_t2.button("🔄 Tải lại dữ liệu", use_container_width=True):
+            st.cache_data.clear()
+            st.toast("🔄 Đã cập nhật lại dữ liệu mới nhất từ CSDL!")
+            st.rerun()
+
+        if col_t3.button("🧹 Xóa hết dữ liệu lỗi", use_container_width=True, help="Xóa toàn bộ bản ghi để làm sạch CSDL"):
+            with engine.connect() as conn:
+                conn.execute(text("TRUNCATE TABLE can_bo RESTART IDENTITY;"))
+                conn.commit()
+            st.cache_data.clear()
+            st.success("Đã làm sạch toàn bộ dữ liệu CSDL. Hãy Upload lại file Excel mẫu!")
             st.rerun()
 
         if df.empty:
@@ -305,16 +317,25 @@ def render_quan_ly_can_bo():
             st.markdown("##### 🗑️ **Xóa dữ liệu cá nhân**")
             col_del1, col_del2 = st.columns([3, 1])
             
-            options_del = {f"{row['ma_can_bo']} - {row['ho_ten']} ({row['khoa_phong']})": row['id'] for _, row in df.iterrows()}
-            selected_del = col_del1.selectbox("Chọn nhân sự muốn xóa:", list(options_del.keys()), key="select_del")
-            
+            # Thêm tùy chọn mặc định để HỦY CHỌN / BỎ CHỌN
+            options_del = {"-- Chọn nhân sự để xóa (Hoặc bỏ chọn) --": None}
+            for _, row in df.iterrows():
+                label = f"{row['ma_can_bo']} - {row['ho_ten']} ({row['khoa_phong'] or 'Chưa phân khoa'})"
+                options_del[label] = row['id']
+                
+            selected_del_label = col_del1.selectbox("Chọn nhân sự muốn xóa:", list(options_del.keys()), key="select_del")
+            target_id = options_del[selected_del_label]
+
             if col_del2.button("🗑️ Xóa nhân sự", use_container_width=True):
-                target_id = options_del[selected_del]
-                with engine.connect() as conn:
-                    conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
-                    conn.commit()
-                st.success(f"Đã xóa thành công nhân sự [{selected_del}]!")
-                st.rerun()
+                if target_id is None:
+                    st.warning("⚠️ Bạn chưa chọn nhân sự nào để xóa!")
+                else:
+                    with engine.connect() as conn:
+                        conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
+                        conn.commit()
+                    st.cache_data.clear()
+                    st.success(f"Đã xóa thành công nhân sự [{selected_del_label}]!")
+                    st.rerun()
 
     # TAB 2: THÊM & SỬA
     with tab2:
@@ -350,6 +371,7 @@ def render_quan_ly_can_bo():
                                     VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
                                 """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save})
                                 conn.commit()
+                            st.cache_data.clear()
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
                             st.rerun()
                         except Exception as ex:
@@ -403,18 +425,19 @@ def render_quan_ly_can_bo():
                                     WHERE id = :id
                                 """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save, "id": edit_id})
                                 conn.commit()
+                            st.cache_data.clear()
                             st.success("Đã cập nhật thông tin thành công!")
                             st.rerun()
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ CẢI TIẾN NHẬN DIỆN MỌI ĐỊNH DẠNG TÊN CỘT)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ CẢI TIẾN ĐỌC CHUẨN TẤT CẢ TIÊU ĐỀ EXCEL)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
         with col_m1:
             st.markdown("##### 📥 **1. Tải về file Excel mẫu chuẩn**")
-            st.caption("Mẫu file Excel bao gồm đầy đủ tất cả các trường thông tin quản lý nhân sự.")
+            st.caption("Hãy tải file mẫu này để nhập dữ liệu chính xác 100%.")
             
             sample_df = pd.DataFrame({
                 'ID': [1, 2],
@@ -434,9 +457,9 @@ def render_quan_ly_can_bo():
                 sample_df.to_excel(writer, index=False, sheet_name='Mau_Nhan_Su')
             
             st.download_button(
-                label="📄 Tải Mẫu Excel Đầy Đủ Cột (.xlsx)",
+                label="📄 Tải Mẫu Excel Chuẩn (.xlsx)",
                 data=output_sample.getvalue(),
-                file_name="Mau_Danh_Sach_Nhan_Su_Chuan.xlsx",
+                file_name="Mau_Danh_Sach_Nhan_Su_BVBD.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
@@ -447,14 +470,13 @@ def render_quan_ly_can_bo():
             
             if uploaded_file is not None:
                 try:
-                    df_up = pd.read_excel(uploaded_file)
-                    st.markdown("**Xem trước 5 dòng đầu tiên trong file:**")
+                    df_up = pd.read_excel(uploaded_file, dtype=str)
+                    st.markdown("**Xem trước dữ liệu nhận diện từ File Excel:**")
                     st.dataframe(df_up.head(5), use_container_width=True)
                     
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
                         cols = df_up.columns.tolist()
                         
-                        # Thuật toán tìm cột thông minh hỗ trợ cả tiếng Việt không dấu & có dấu
                         def get_col(keywords):
                             for col in cols:
                                 norm_col = remove_vietnamese_accent(str(col))
@@ -466,55 +488,49 @@ def render_quan_ly_can_bo():
                         c_macb = get_col(['macanbo', 'mcb', 'manhanvien', 'manv', 'stt'])
                         c_hoten = get_col(['hovaten', 'hoten', 'tencanbo', 'tennhanvien', 'fullname', 'ten'])
                         c_ngaysinh = get_col(['ngaysinh', 'ns', 'dob', 'dateofbirth'])
-                        c_cccd = get_col(['socccd', 'cccd', 'cmnd', 'socmnd', 'citizencard'])
-                        c_chucdanh = get_col(['chucdanh', 'chucvu', 'vitri', 'position'])
-                        c_khoaphong = get_col(['khoaphong', 'khoa', 'phong', 'phongban', 'donvi', 'department'])
-                        c_trinhdo = get_col(['trinhdo', 'bangcap', 'hocluc', 'degree'])
-                        c_sdt = get_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone', 'mobile'])
+                        c_cccd = get_col(['socccd', 'cccd', 'cmnd', 'socmnd'])
+                        c_chucdanh = get_col(['chucdanh', 'chucvu', 'vitri'])
+                        c_khoaphong = get_col(['khoaphong', 'khoa', 'phong', 'donvi'])
+                        c_trinhdo = get_col(['trinhdo', 'bangcap', 'hocluc'])
+                        c_sdt = get_col(['sodienthoai', 'sdtt', 'sdt', 'dienthoai', 'phone'])
                         c_email = get_col(['email', 'mail'])
 
                         if not c_hoten and len(cols) >= 2:
                             c_macb = cols[0]
                             c_hoten = cols[1]
 
+                        def clean_str(val):
+                            if pd.isna(val) or val is None:
+                                return None
+                            s = str(val).strip()
+                            if s.lower() in ['nan', 'none', '', 'null', 'nat']:
+                                return None
+                            if s.endswith('.0'):
+                                s = s[:-2]
+                            return s
+
                         count_inserted = 0
                         with engine.connect() as conn:
                             for idx, row in df_up.iterrows():
-                                h = str(row[c_hoten]).strip() if c_hoten and pd.notna(row[c_hoten]) else ''
+                                h = clean_str(row[c_hoten]) if c_hoten else None
+                                m = clean_str(row[c_macb]) if c_macb else f"CB{idx+1:04d}"
                                 
-                                raw_m = str(row[c_macb]).strip() if c_macb and pd.notna(row[c_macb]) else ''
-                                if not raw_m or raw_m.lower() == 'nan':
-                                    m = f"CB{idx+1:04d}"
-                                else:
-                                    m = raw_m
-
+                                raw_ns = clean_str(row[c_ngaysinh]) if c_ngaysinh else None
                                 ns_val = None
-                                if c_ngaysinh and pd.notna(row[c_ngaysinh]):
+                                if raw_ns:
                                     try:
-                                        ns_val = pd.to_datetime(row[c_ngaysinh]).date()
+                                        ns_val = pd.to_datetime(raw_ns, dayfirst=True).date()
                                     except Exception:
                                         ns_val = None
 
-                                cccd_val = str(row[c_cccd]).strip() if c_cccd and pd.notna(row[c_cccd]) else None
-                                if cccd_val and cccd_val.lower() == 'nan': cccd_val = None
+                                cccd_val = clean_str(row[c_cccd]) if c_cccd else None
+                                c_val = clean_str(row[c_chucdanh]) if c_chucdanh else None
+                                k_val = clean_str(row[c_khoaphong]) if c_khoaphong else None
+                                t_val = clean_str(row[c_trinhdo]) if c_trinhdo else None
+                                s_val = clean_str(row[c_sdt]) if c_sdt else None
+                                e_val = clean_str(row[c_email]) if c_email else None
 
-                                c = str(row[c_chucdanh]).strip() if c_chucdanh and pd.notna(row[c_chucdanh]) else None
-                                if c and c.lower() == 'nan': c = None
-
-                                k = str(row[c_khoaphong]).strip() if c_khoaphong and pd.notna(row[c_khoaphong]) else None
-                                if k and k.lower() == 'nan': k = None
-
-                                t = str(row[c_trinhdo]).strip() if c_trinhdo and pd.notna(row[c_trinhdo]) else None
-                                if t and t.lower() == 'nan': t = None
-
-                                str_sdt = str(row[c_sdt]).strip() if c_sdt and pd.notna(row[c_sdt]) else None
-                                if str_sdt and str_sdt.endswith('.0'): str_sdt = str_sdt[:-2]
-                                if str_sdt and str_sdt.lower() == 'nan': str_sdt = None
-
-                                e = str(row[c_email]).strip() if c_email and pd.notna(row[c_email]) else None
-                                if e and e.lower() == 'nan': e = None
-
-                                if h and h.lower() != 'nan':
+                                if h:
                                     check_res = conn.execute(text("SELECT id FROM can_bo WHERE ma_can_bo = :m"), {"m": m}).fetchone()
                                     if check_res:
                                         conn.execute(text("""
@@ -522,26 +538,27 @@ def render_quan_ly_can_bo():
                                                 ho_ten = :h, ngay_sinh = :ns, so_cccd = :cccd, chuc_danh = :c, 
                                                 khoa_phong = :k, trinh_do = :t, so_dien_thoai = :s, email = :e
                                             WHERE ma_can_bo = :m
-                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c, "k": k, "t": t, "s": str_sdt, "e": e})
+                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c_val, "k": k_val, "t": t_val, "s": s_val, "e": e_val})
                                     else:
                                         conn.execute(text("""
                                             INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                             VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
-                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c, "k": k, "t": t, "s": str_sdt, "e": e})
+                                        """), {"m": m, "h": h, "ns": ns_val, "cccd": cccd_val, "c": c_val, "k": k_val, "t": t_val, "s": s_val, "e": e_val})
                                     count_inserted += 1
                             
                             conn.commit()
                         
                         if count_inserted > 0:
+                            st.cache_data.clear()
                             st.session_state['upload_success_msg'] = f"🎉 Đã nhập thành công {count_inserted} nhân sự vào hệ thống!"
                             st.rerun()
                         else:
-                            st.error("❌ Không tìm thấy thông tin Họ và Tên hợp lệ. Vui lòng thử lại!")
+                            st.error("❌ Không tìm thấy dữ liệu Họ và Tên hợp lệ trong file Excel. Vui lòng kiểm tra lại!")
 
                 except Exception as e_up:
                     st.error(f"Lỗi nhập dữ liệu: {e_up}")
 
-    # TAB 4: XUẤT EXCEL (ĐẦY ĐỦ CÁC CỘT DỮ LIỆU KHÔNG THIẾU CỘT NÀO)
+    # TAB 4: XUẤT EXCEL
     with tab4:
         st.markdown("##### 📊 **Tải toàn bộ dữ liệu Cán bộ CNV ra file Excel**")
         if df.empty:
