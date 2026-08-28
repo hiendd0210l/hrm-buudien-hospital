@@ -1,7 +1,6 @@
 import os
 import io
 import base64
-import unicodedata
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -91,15 +90,8 @@ if 'db_initialized' not in st.session_state:
     st.session_state['db_initialized'] = False
 
 # ---------------------------------------------------------
-# 2. HÀM CHUẨN HÓA TIẾNG VIỆT & DATABASE NEON
+# 2. DATABASE NEON
 # ---------------------------------------------------------
-def remove_vietnamese_accent(text_str):
-    if not isinstance(text_str, str):
-        return ""
-    text_str = unicodedata.normalize('NFD', text_str)
-    text_str = ''.join(c for c in text_str if unicodedata.category(c) != 'MN')
-    return text_str.replace('đ', 'd').replace('Đ', 'D').lower().replace(" ", "").replace("_", "").replace("-", "").replace("/", "")
-
 @st.cache_resource
 def get_db_engine():
     try:
@@ -267,7 +259,7 @@ def render_dashboard_home():
         st.plotly_chart(fig_donut, use_container_width=True)
 
 # ---------------------------------------------------------
-# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV
+# 5. QUẢN LÝ CÁN BỘ CNV
 # ---------------------------------------------------------
 def render_quan_ly_can_bo():
     st.markdown("---")
@@ -276,10 +268,6 @@ def render_quan_ly_can_bo():
     if not engine:
         st.error("Chưa kết nối được Cơ sở dữ liệu Neon. Vui lòng kiểm tra lại cấu hình Secrets.")
         return
-
-    if 'upload_success_msg' in st.session_state:
-        st.success(st.session_state['upload_success_msg'])
-        del st.session_state['upload_success_msg']
 
     df = load_data_from_db()
 
@@ -290,7 +278,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
 
-    # TAB 1: DANH SÁCH & XÓA CÁ NHÂN (ẨN CỘT ID & ĐẶT TÊN CỘT RÕ RÀNG)
+    # TAB 1: DANH SÁCH & XÓA
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -314,7 +302,6 @@ def render_quan_ly_can_bo():
         if df.empty:
             st.info("Chưa có dữ liệu nhân sự trong CSDL. Bạn có thể thêm mới hoặc nhập từ file Excel.")
         else:
-            # Đổi tên các cột hiển thị tiếng Việt rõ ràng và bỏ cột id
             display_df = df.drop(columns=['id']).copy()
             display_df.columns = [
                 'Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Số CCCD', 
@@ -446,13 +433,13 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ẨN HOÀN TOÀN PHẦN KHỚP NỐI THỦ CÔNG)
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
         with col_m1:
             st.markdown("##### 📥 **1. Tải về file Excel mẫu chuẩn**")
-            st.caption("Hãy tải file mẫu chuẩn này để nhập dữ liệu chính xác nhất.")
+            st.caption("Hãy sử dụng đúng file mẫu chuẩn này để hệ thống tự động nhận diện dữ liệu chính xác.")
             
             sample_df = pd.DataFrame({
                 'Mã Cán bộ': ['CB001', 'CB002'],
@@ -488,48 +475,43 @@ def render_quan_ly_can_bo():
                     st.markdown(f"**Xem trước dữ liệu (Tổng số dòng: {len(df_up)}):**")
                     st.dataframe(df_up.head(5), use_container_width=True, hide_index=True)
                     
-                    columns_in_file = df_up.columns.tolist()
-                    
-                    st.markdown("---")
-                    st.markdown("##### 🔗 **Khớp nối cột dữ liệu từ file của bạn:**")
-                    col_map1, col_map2 = st.columns(2)
-                    
-                    def find_col_index(keywords):
-                        for idx, col in enumerate(columns_in_file):
-                            norm = remove_vietnamese_accent(str(col))
-                            for kw in keywords:
-                                if kw in norm:
-                                    return idx
-                        return 0
-
-                    c_macb_sel = col_map1.selectbox("Cột chứa Mã cán bộ", columns_in_file, index=find_col_index(['macanbo', 'mcb', 'manv', 'macan']))
-                    c_hoten_sel = col_map2.selectbox("Cột chứa Họ và Tên (*)", columns_in_file, index=find_col_index(['hoten', 'hovaten', 'ten', 'fullname']))
-                    c_ns_sel = col_map1.selectbox("Cột chứa Ngày sinh", columns_in_file, index=find_col_index(['ngaysinh', 'ns', 'dob']))
-                    c_cccd_sel = col_map2.selectbox("Cột chứa Số CCCD", columns_in_file, index=find_col_index(['cccd', 'cmnd', 'socmnd']))
-                    c_cd_sel = col_map1.selectbox("Cột chứa Chức danh", columns_in_file, index=find_col_index(['chucdanh', 'chucvu', 'vitri']))
-                    c_kp_sel = col_map2.selectbox("Cột chứa Khoa / Phòng", columns_in_file, index=find_col_index(['khoaphong', 'khoa', 'phong']))
-                    c_td_sel = col_map1.selectbox("Cột chứa Trình độ", columns_in_file, index=find_col_index(['trinhdo', 'bangcap']))
-                    c_sdt_sel = col_map2.selectbox("Cột chứa Số điện thoại", columns_in_file, index=find_col_index(['sdt', 'dienthoai', 'phone']))
-                    c_email_sel = col_map1.selectbox("Cột chứa Email", columns_in_file, index=find_col_index(['email', 'mail']))
-
                     st.markdown("<br>", unsafe_allow_html=True)
 
                     if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True, type="primary"):
                         count_inserted = 0
                         error_logs = []
                         
+                        # Tự động ánh xạ các cột dựa theo file mẫu chuẩn
+                        col_list = list(df_up.columns)
+                        
+                        def get_col_val(row_item, possible_names):
+                            for name in possible_names:
+                                for col in col_list:
+                                    if name.lower() in str(col).lower():
+                                        val = row_item[col]
+                                        if pd.notna(val):
+                                            s_val = str(val).strip()
+                                            if s_val.lower() not in ['nan', 'none', '', 'null']:
+                                                if s_val.endswith('.0'):
+                                                    s_val = s_val[:-2]
+                                                return s_val
+                            return None
+
                         with engine.connect() as conn:
                             for idx, row in df_up.iterrows():
                                 try:
-                                    h_val = str(row[c_hoten_sel]).strip() if pd.notna(row[c_hoten_sel]) else ""
-                                    if not h_val or h_val.lower() in ['nan', 'none', '']:
+                                    h_val = get_col_val(row, ['ho và tên', 'ho ten', 'họ tên', 'ten', 'fullname'])
+                                    if not h_val:
                                         continue
                                         
-                                    m_val = str(row[c_macb_sel]).strip() if pd.notna(row[c_macb_sel]) else f"CB{idx+1:04d}"
-                                    if m_val.endswith('.0'): 
-                                        m_val = m_val[:-2]
-
-                                    raw_ns = row[c_ns_sel] if c_ns_sel else None
+                                    m_val = get_col_val(row, ['mã cán bộ', 'ma can bo', 'mcb', 'ma nv', 'mã nhân viên']) or f"CB{idx+1:04d}"
+                                    
+                                    raw_ns = None
+                                    for col in col_list:
+                                        if 'ngày sinh' in str(col).lower() or 'ngay sinh' in str(col).lower() or 'ns' in str(col).lower():
+                                            raw_ns = row[col]
+                                            break
+                                    
                                     ns_val = None
                                     if pd.notna(raw_ns):
                                         try:
@@ -540,22 +522,12 @@ def render_quan_ly_can_bo():
                                         except Exception:
                                             ns_val = None
 
-                                    def get_val(col_name):
-                                        if not col_name or col_name not in row or pd.isna(row[col_name]):
-                                            return None
-                                        val = str(row[col_name]).strip()
-                                        if val.lower() in ['nan', 'none', '', 'null']:
-                                            return None
-                                        if val.endswith('.0'):
-                                            val = val[:-2]
-                                        return val
-
-                                    cccd_val = get_val(c_cccd_sel)
-                                    cd_val = get_val(c_cd_sel)
-                                    kp_val = get_val(c_kp_sel)
-                                    td_val = get_val(c_td_sel)
-                                    sdt_val = get_val(c_sdt_sel)
-                                    email_val = get_val(c_email_sel)
+                                    cccd_val = get_col_val(row, ['cccd', 'cmnd', 'số cccd'])
+                                    cd_val = get_col_val(row, ['chức danh', 'chuc danh', 'chức vụ', 'vị trí'])
+                                    kp_val = get_col_val(row, ['khoa', 'phòng', 'khoa / phòng', 'khoaphong'])
+                                    td_val = get_col_val(row, ['trình độ', 'trinh do', 'bằng cấp'])
+                                    sdt_val = get_col_val(row, ['điện thoại', 'dien thoai', 'sdt', 'phone'])
+                                    email_val = get_col_val(row, ['email', 'mail'])
 
                                     conn.execute(text("""
                                         INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
@@ -573,11 +545,10 @@ def render_quan_ly_can_bo():
                         if count_inserted > 0:
                             st.cache_data.clear()
                             st.success(f"🎉 Đã nhập thành công {count_inserted} nhân sự vào cơ sở dữ liệu Neon!")
-                            if error_logs:
-                                st.warning(f"Có {len(error_logs)} dòng gặp lỗi và bị bỏ qua.")
                             st.balloons()
+                            st.rerun()
                         else:
-                            st.error("❌ Không chèn được dữ liệu nào. Vui lòng kiểm tra lại tên cột Họ và Tên hoặc định dạng file.")
+                            st.error("❌ Không chèn được dữ liệu nào. Vui lòng đảm bảo file upload sử dụng đúng định dạng mẫu chuẩn.")
 
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
