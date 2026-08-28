@@ -88,7 +88,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # ---------------------------------------------------------
-# 2. KẾT NỐI DATABASE NEON & TỰ ĐỘNG BỎ RÀNG BUỘC NOT NULL TOÀN BẢNG
+# 2. KẾT NỐI DATABASE NEON & SỬA LỖI CONSTRAINT AUTOMATICALLY
 # ---------------------------------------------------------
 def get_db_engine():
     try:
@@ -137,8 +137,8 @@ def get_db_engine():
             for col_name, col_type in columns_to_check:
                 conn.execute(text(f"ALTER TABLE can_bo ADD COLUMN IF NOT EXISTS {col_name} {col_type};"))
 
-            # TỰ ĐỘNG QUÉT VÀ BỎ 'NOT NULL' TRÊN TẤT CẢ CÁC CỘT CỦA BẢNG can_bo (TRỪ ID)
-            res = conn.execute(text("""
+            # 1. BỎ 'NOT NULL' CHO TẤT CẢ CÁC CỘT (TRỪ ID)
+            res_notnull = conn.execute(text("""
                 SELECT column_name 
                 FROM information_schema.columns 
                 WHERE table_name = 'can_bo' 
@@ -146,10 +146,25 @@ def get_db_engine():
                   AND column_name != 'id';
             """)).fetchall()
 
-            for row in res:
+            for row in res_notnull:
                 col_to_drop = row[0]
                 try:
                     conn.execute(text(f'ALTER TABLE can_bo ALTER COLUMN "{col_to_drop}" DROP NOT NULL;'))
+                except Exception:
+                    pass
+
+            # 2. XÓA BỎ MỌI RÀNG BUỘC 'UNIQUE' TRÊN BẢNG CAN_BO (TRỪ KHÓA CHÍNH PRIMARY KEY)
+            res_unique = conn.execute(text("""
+                SELECT constraint_name 
+                FROM information_schema.table_constraints 
+                WHERE table_name = 'can_bo' 
+                  AND constraint_type = 'UNIQUE';
+            """)).fetchall()
+
+            for row in res_unique:
+                c_name = row[0]
+                try:
+                    conn.execute(text(f'ALTER TABLE can_bo DROP CONSTRAINT IF EXISTS "{c_name}";'))
                 except Exception:
                     pass
 
@@ -355,11 +370,15 @@ def render_quan_ly_can_bo():
                         st.warning("Vui lòng nhập đầy đủ Mã Cán bộ và Họ Tên!")
                     else:
                         try:
+                            cccd_save = so_cccd.strip() if so_cccd and so_cccd.strip() else None
+                            sdt_save = sdt.strip() if sdt and sdt.strip() else None
+                            email_save = email.strip() if email and email.strip() else None
+                            
                             with engine.connect() as conn:
                                 conn.execute(text("""
                                     INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
                                     VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
-                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": so_cccd.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email})
+                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save})
                                 conn.commit()
                             st.cache_data.clear()
                             st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
@@ -403,13 +422,17 @@ def render_quan_ly_can_bo():
                     
                     if btn_update:
                         try:
+                            cccd_save = so_cccd.strip() if so_cccd and so_cccd.strip() else None
+                            sdt_save = sdt.strip() if sdt and sdt.strip() else None
+                            email_save = email.strip() if email and email.strip() else None
+
                             with engine.connect() as conn:
                                 conn.execute(text("""
                                     UPDATE can_bo 
                                     SET ma_can_bo = :m, ho_ten = :h, ngay_sinh = :ns, so_cccd = :cccd, chuc_danh = :c, 
                                         khoa_phong = :k, trinh_do = :t, so_dien_thoai = :s, email = :e
                                     WHERE id = :id
-                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": so_cccd.strip(), "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email, "id": edit_id})
+                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save, "id": edit_id})
                                 conn.commit()
                             st.cache_data.clear()
                             st.success("Đã cập nhật thông tin thành công!")
@@ -502,15 +525,25 @@ def render_quan_ly_can_bo():
                                     except Exception:
                                         ns_val = None
 
-                                cccd_val = str(row[c_cccd]).strip() if c_cccd and pd.notna(row[c_cccd]) else ''
-                                if cccd_val.lower() == 'nan':
-                                    cccd_val = ''
+                                # NẾU TRỐNG THÌ CHUYỂN THÀNH NONE (NULL), TRÁNH TRÙNG CHUỖI RỖNG
+                                cccd_val = str(row[c_cccd]).strip() if c_cccd and pd.notna(row[c_cccd]) else None
+                                if cccd_val and cccd_val.lower() == 'nan':
+                                    cccd_val = None
 
-                                c = str(row[c_chucdanh]).strip() if c_chucdanh and pd.notna(row[c_chucdanh]) else ''
-                                k = str(row[c_khoaphong]).strip() if c_khoaphong and pd.notna(row[c_khoaphong]) else ''
-                                t = str(row[c_trinhdo]).strip() if c_trinhdo and pd.notna(row[c_trinhdo]) else ''
-                                s = str(row[c_sdt]).strip() if c_sdt and pd.notna(row[c_sdt]) else ''
-                                e = str(row[c_email]).strip() if c_email and pd.notna(row[c_email]) else ''
+                                c = str(row[c_chucdanh]).strip() if c_chucdanh and pd.notna(row[c_chucdanh]) else None
+                                if c and c.lower() == 'nan': c = None
+
+                                k = str(row[c_khoaphong]).strip() if c_khoaphong and pd.notna(row[c_khoaphong]) else None
+                                if k and k.lower() == 'nan': k = None
+
+                                t = str(row[c_trinhdo]).strip() if c_trinhdo and pd.notna(row[c_trinhdo]) else None
+                                if t and t.lower() == 'nan': t = None
+
+                                s = str(row[c_sdt]).strip() if c_sdt and pd.notna(row[c_sdt]) else None
+                                if s and s.lower() == 'nan': s = None
+
+                                e = str(row[c_email]).strip() if c_email and pd.notna(row[c_email]) else None
+                                if e and e.lower() == 'nan': e = None
 
                                 if h and h.lower() != 'nan':
                                     check_res = conn.execute(text("SELECT id FROM can_bo WHERE ma_can_bo = :m"), {"m": m}).fetchone()
