@@ -17,32 +17,23 @@ st.set_page_config(
 # 2. KẾT NỐI DATABASE NEON POSTGRESQL (DÙNG DATABASE_URL)
 # ---------------------------------------------------------
 import urllib.parse
+from sqlalchemy import create_engine, text
 
 @st.cache_resource
 def get_db_engine():
     try:
-        # Nếu dùng cấu hình [postgres]
-        if "postgres" in st.secrets:
-            pg = st.secrets["postgres"]
-            user = pg["user"]
-            password = urllib.parse.quote_plus(pg["password"]) # Mã hóa ký tự đặc biệt
-            host = pg["host"]
-            port = pg["port"]
-            database = pg["database"]
-            
-            db_url = f"postgresql://{user}:{password}@{host}:{port}/{database}?sslmode=require"
-            return create_engine(db_url)
-            
-        # Dự phòng nếu dùng DATABASE_URL
-        elif "DATABASE_URL" in st.secrets:
-            db_url = st.secrets["DATABASE_URL"]
-            if db_url.startswith("postgres://"):
-                db_url = db_url.replace("postgres://", "postgresql://", 1)
-            return create_engine(db_url)
-            
-        else:
-            st.warning("⚠️ Chưa cấu hình Secrets!")
+        if "DATABASE_URL" not in st.secrets:
+            st.warning("⚠️ Chưa cấu hình DATABASE_URL trong Secrets.")
             return None
+            
+        raw_url = st.secrets["DATABASE_URL"].strip()
+        
+        # Chuyển đổi postgres:// thành postgresql:// nếu có
+        if raw_url.startswith("postgres://"):
+            raw_url = raw_url.replace("postgres://", "postgresql://", 1)
+            
+        engine = create_engine(raw_url, pool_pre_ping=True)
+        return engine
     except Exception as e:
         st.error(f"Lỗi kết nối CSDL: {e}")
         return None
