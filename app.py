@@ -188,7 +188,7 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (SỬA LỖI SVG CODE BLOCK & NÚT 3D)
+# 3. TRANG ĐĂNG NHẬP (DÙNG FILE ẢNH LOGO CHUẨN & NÚT 3D)
 # ---------------------------------------------------------
 def render_login():
     st.markdown("<br>", unsafe_allow_html=True)
@@ -196,10 +196,8 @@ def render_login():
     col_l, col_center, col_r = st.columns([1.8, 1.4, 1.8])
 
     with col_center:
-        # LOGO BEHNVIENBUUDIEN CHUẨN SVG (Đã gom 1 dòng tránh lỗi Markdown)
-        logo_html = '<div style="text-align: center; margin-bottom: 10px;"><svg width="130" height="130" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><circle cx="100" cy="100" r="92" fill="#0066b2"/><circle cx="100" cy="100" r="68" fill="#ffffff"/><path id="text-path" d="M 36 100 A 64 64 0 0 1 164 100" fill="none"/><text fill="#ffffff" font-size="13.5" font-weight="900" font-family="Arial, sans-serif"><textPath href="#text-path" startOffset="50%" text-anchor="middle">BỆNH VIỆN BƯU ĐIỆN</textPath></text><polygon points="35,100 37,105 42,105 38,108 39,113 35,110 31,113 32,108 28,105 33,105" fill="#ffffff"/><polygon points="165,100 167,105 172,105 168,108 169,113 165,110 161,113 162,108 158,105 163,105" fill="#ffffff"/><text x="100" y="174" fill="#ffffff" font-size="16" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="2">VNPT</text><rect x="87" y="58" width="26" height="64" fill="#e51c23" rx="2"/><rect x="68" y="77" width="64" height="26" fill="#e51c23" rx="2"/><path d="M 61 115 C 72 138, 100 148, 100 148 C 100 148, 128 138, 139 115 C 122 135, 100 132, 100 132 C 100 132, 78 135, 61 115 Z" fill="#7cb342"/><path d="M 77 121 C 88 132, 100 135, 100 135 C 100 135, 112 132, 123 121 C 112 127, 100 126, 100 126 C 100 126, 88 127, 77 121 Z" fill="#7cb342"/></svg></div>'
-        
-        st.markdown(logo_html, unsafe_allow_html=True)
+        # Tải logo từ file ảnh chuẩn trong cùng thư mục
+        st.image("logo.png", width=140)
 
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
         st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
@@ -226,6 +224,7 @@ def render_login():
                 st.info("Đã đóng phiên đăng nhập.")
 
         st.markdown("</div>", unsafe_allow_html=True)
+        
 # ---------------------------------------------------------
 # 4. GIAO DIỆN DASHBOARD
 # ---------------------------------------------------------
