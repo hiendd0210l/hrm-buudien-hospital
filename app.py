@@ -183,14 +183,18 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP
+# 3. TRANG ĐĂNG NHẬP (ĐÃ XÓA Ô TRẮNG THỪA & CHỈNH NÚT XANH DƯƠNG)
 # ---------------------------------------------------------
 def render_login():
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     
     col_l, col_center, col_r = st.columns([1.5, 2.0, 1.5])
 
     with col_center:
+        # Gom tất cả vào bên trong khung login-card để không bị ô trắng thừa
+        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
+
+        # 1. HÌNH LOGO BỆNH VIỆN BƯU ĐIỆN
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png") if '__file__' in globals() else "logo.png"
 
         if os.path.exists(logo_path):
@@ -198,27 +202,26 @@ def render_login():
                 encoded_img = base64.b64encode(f.read()).decode("utf-8")
             st.markdown(
                 f"""
-                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">
-                    <img src="data:image/png;base64,{encoded_img}" width="200" style="object-fit: contain;">
+                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 12px;">
+                    <img src="data:image/png;base64,{encoded_img}" width="180" style="object-fit: contain;">
                 </div>
                 """,
                 unsafe_allow_html=True
             )
         else:
-            st.markdown('<div style="display: flex; justify-content: center; align-items: center; margin-bottom: 10px;">', unsafe_allow_html=True)
-            st.image("logo.png", width=200)
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.image("logo.png", width=180)
 
+        # 2. TIÊU ĐỀ
         st.markdown("<div class='hospital-title'>BỆNH VIỆN BƯU ĐIỆN</div>", unsafe_allow_html=True)
         st.markdown("<div class='hospital-subtitle'>Hệ thống Quản trị Nhân sự & Điều hành</div>", unsafe_allow_html=True)
 
-        # Mở khung đăng nhập trực tiếp (đã xóa ô trắng thừa)
-        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
-        
+        # 3. Ô NHẬP LIỆU
         username = st.text_input("Tên đăng nhập / Username:", placeholder="Nhập tên đăng nhập...")
         password = st.text_input("Mật khẩu / Password:", type="password", placeholder="Nhập mật khẩu...")
 
         st.markdown("<br>", unsafe_allow_html=True)
+
+        # 4. HÀNG NÚT BẤM (MÀU XANH DƯƠNG, CHỮ IN ĐẬM)
         b_col1, b_col2 = st.columns(2)
 
         with b_col1:
