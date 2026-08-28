@@ -290,7 +290,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
 
-    # TAB 1: DANH SÁCH & XÓA CÁ NHÂN (BỔ SUNG NÚT HỦY THAO TÁC XÓA)
+    # TAB 1: DANH SÁCH & XÓA CÁ NHÂN (ĐÃ ẨN CỘT ID & SỬA SELECTBOX XÓA)
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -314,7 +314,9 @@ def render_quan_ly_can_bo():
         if df.empty:
             st.info("Chưa có dữ liệu nhân sự trong CSDL. Bạn có thể thêm mới hoặc nhập từ file Excel.")
         else:
-            st.dataframe(df, use_container_width=True)
+            # Ẩn cột 'id' và ẩn số thứ tự dòng (hide_index=True)
+            display_df = df.drop(columns=['id'])
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
             
             st.markdown("---")
             st.markdown("##### 🗑️ **Xóa dữ liệu cá nhân**")
@@ -322,7 +324,11 @@ def render_quan_ly_can_bo():
             
             options_del = {"-- Chọn nhân sự để xóa --": None}
             for _, row in df.iterrows():
-                label = f"{row['ma_can_bo']} - {row['ho_ten']} ({row['khoa_phong'] or 'Chưa phân khoa'})"
+                # Lấy đúng thông tin hiển thị mã, họ tên, khoa phòng
+                mcb = str(row['ma_can_bo']) if pd.notna(row['ma_can_bo']) else "N/A"
+                hoten = str(row['ho_ten']) if pd.notna(row['ho_ten']) else "N/A"
+                khoa = str(row['khoa_phong']) if pd.notna(row['khoa_phong']) else "Chưa phân khoa"
+                label = f"{mcb} - {hoten} ({khoa})"
                 options_del[label] = row['id']
                 
             selected_del_label = col_del1.selectbox("Chọn nhân sự muốn xóa:", list(options_del.keys()), key="select_del")
@@ -437,7 +443,7 @@ def render_quan_ly_can_bo():
                         except Exception as ex:
                             st.error(f"Lỗi cập nhật: {ex}")
 
-    # TAB 3: TẢI MẪU & UPLOAD EXCEL (ĐÃ SỬA CƠ CHẾ ÁNH XẠ CHÍNH XÁC CHO TỪNG CỘT)
+    # TAB 3: TẢI MẪU & UPLOAD EXCEL
     with tab3:
         col_m1, col_m2 = st.columns([1.5, 2])
         
@@ -477,7 +483,7 @@ def render_quan_ly_can_bo():
                 try:
                     df_up = pd.read_excel(uploaded_file)
                     st.markdown(f"**Xem trước dữ liệu (Tổng số dòng: {len(df_up)}):**")
-                    st.dataframe(df_up.head(5), use_container_width=True)
+                    st.dataframe(df_up.head(5), use_container_width=True, hide_index=True)
                     
                     columns_in_file = df_up.columns.tolist()
                     
@@ -582,8 +588,8 @@ def render_quan_ly_can_bo():
         if df.empty:
             st.info("Chưa có dữ liệu để xuất file.")
         else:
-            export_df = df[['id', 'ma_can_bo', 'ho_ten', 'ngay_sinh', 'so_cccd', 'chuc_danh', 'khoa_phong', 'trinh_do', 'so_dien_thoai', 'email']].copy()
-            export_df.columns = ['ID', 'Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Số CCCD', 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email']
+            export_df = df[['ma_can_bo', 'ho_ten', 'ngay_sinh', 'so_cccd', 'chuc_danh', 'khoa_phong', 'trinh_do', 'so_dien_thoai', 'email']].copy()
+            export_df.columns = ['Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Số CCCD', 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email']
             
             output_exp = io.BytesIO()
             with pd.ExcelWriter(output_exp, engine='openpyxl') as writer:
