@@ -290,7 +290,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
 
-    # TAB 1: DANH SÁCH & XÓA CÁ NHÂN (ĐÃ ẨN CỘT ID & SỬA SELECTBOX XÓA)
+    # TAB 1: DANH SÁCH & XÓA CÁ NHÂN (ẨN CỘT ID & ĐẶT TÊN CỘT RÕ RÀNG)
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -314,8 +314,12 @@ def render_quan_ly_can_bo():
         if df.empty:
             st.info("Chưa có dữ liệu nhân sự trong CSDL. Bạn có thể thêm mới hoặc nhập từ file Excel.")
         else:
-            # Ẩn cột 'id' và ẩn số thứ tự dòng (hide_index=True)
-            display_df = df.drop(columns=['id'])
+            # Đổi tên các cột hiển thị tiếng Việt rõ ràng và bỏ cột id
+            display_df = df.drop(columns=['id']).copy()
+            display_df.columns = [
+                'Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Số CCCD', 
+                'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email'
+            ]
             st.dataframe(display_df, use_container_width=True, hide_index=True)
             
             st.markdown("---")
@@ -324,7 +328,6 @@ def render_quan_ly_can_bo():
             
             options_del = {"-- Chọn nhân sự để xóa --": None}
             for _, row in df.iterrows():
-                # Lấy đúng thông tin hiển thị mã, họ tên, khoa phòng
                 mcb = str(row['ma_can_bo']) if pd.notna(row['ma_can_bo']) else "N/A"
                 hoten = str(row['ho_ten']) if pd.notna(row['ho_ten']) else "N/A"
                 khoa = str(row['khoa_phong']) if pd.notna(row['khoa_phong']) else "Chưa phân khoa"
@@ -575,9 +578,6 @@ def render_quan_ly_can_bo():
                             st.balloons()
                         else:
                             st.error("❌ Không chèn được dữ liệu nào. Vui lòng kiểm tra lại tên cột Họ và Tên hoặc định dạng file.")
-                            if error_logs:
-                                for err in error_logs[:5]:
-                                    st.write(err)
 
                 except Exception as e_up:
                     st.error(f"Lỗi đọc file Excel: {e_up}")
