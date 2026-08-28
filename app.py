@@ -1,4 +1,5 @@
 import os
+import io
 import base64
 import streamlit as st
 import streamlit.components.v1 as components
@@ -53,11 +54,11 @@ st.markdown("""
     }
 
     /* Ô NHẬP LIỆU TO VÀ DỄ ĐỌC */
-    .stTextInput > label {
+    .stTextInput > label, .stSelectbox > label {
         color: #0f172a !important;
-        font-size: 16px !important;
+        font-size: 15px !important;
         font-weight: 700 !important;
-        margin-bottom: 6px !important;
+        margin-bottom: 4px !important;
     }
 
     .stTextInput > div > div > input {
@@ -65,8 +66,7 @@ st.markdown("""
         border: 1.5px solid #cbd5e1 !important;
         background-color: #ffffff !important;
         color: #0f172a !important;
-        font-size: 16px !important;
-        height: 48px !important;
+        height: 44px !important;
     }
 
     /* CÁC NÚT NHẤN MÀU XANH DƯƠNG CHỮ ĐẬM */
@@ -74,10 +74,10 @@ st.markdown("""
         background: linear-gradient(180deg, #0070d2 0%, #0056a3 100%) !important;
         color: #ffffff !important;
         font-weight: 800 !important;
-        font-size: 17px !important;
+        font-size: 16px !important;
         border-radius: 8px !important;
         border: 1px solid #004080 !important;
-        height: 48px !important;
+        height: 44px !important;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12) !important;
         transition: all 0.2s ease !important;
         width: 100% !important;
@@ -86,7 +86,7 @@ st.markdown("""
     .stButton > button p, div[data-testid="stFormSubmitButton"] > button p {
         color: #ffffff !important;
         font-weight: 800 !important;
-        font-size: 17px !important;
+        font-size: 16px !important;
     }
 
     .stButton > button:hover, div[data-testid="stFormSubmitButton"] > button:hover {
@@ -164,15 +164,18 @@ def get_db_engine():
         else:
             return None
 
-        # Tự động khởi tạo bảng nếu chưa có
+        # Tự động tạo bảng nếu chưa có với đầy đủ các thuộc tính nhân sự
         with eng.connect() as conn:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS can_bo (
                     id SERIAL PRIMARY KEY,
-                    ma_cb VARCHAR(50) UNIQUE,
-                    ho_ten VARCHAR(255),
+                    ma_cb VARCHAR(50) UNIQUE NOT NULL,
+                    ho_ten VARCHAR(255) NOT NULL,
                     chuc_danh VARCHAR(100),
-                    khoa_phong VARCHAR(255)
+                    khoa_phong VARCHAR(255),
+                    trinh_do VARCHAR(100),
+                    so_dien_thoai VARCHAR(20),
+                    email VARCHAR(100)
                 );
             """))
             conn.commit()
@@ -184,7 +187,7 @@ def get_db_engine():
 engine = get_db_engine()
 
 # ---------------------------------------------------------
-# 3. TRANG ĐĂNG NHẬP (HỖ TRỢ ENTER & ESC)
+# 3. TRANG ĐĂNG NHẬP (ENTER & ESC)
 # ---------------------------------------------------------
 def render_login():
     st.markdown("<br>", unsafe_allow_html=True)
@@ -192,7 +195,6 @@ def render_login():
 
     with col_center:
         with st.form(key="login_form", clear_on_submit=False):
-
             logo_path = os.path.join(os.path.dirname(__file__), "logo.png") if '__file__' in globals() else "logo.png"
 
             if os.path.exists(logo_path):
@@ -249,7 +251,273 @@ def render_login():
     """, height=0)
 
 # ---------------------------------------------------------
-# 4. GIAO DIỆN DASHBOARD CHÍNH
+# 4. TRANG CHỦ & DASHBOARD
+# ---------------------------------------------------------
+def render_dashboard_home():
+    st.markdown("<br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("<div class='card-box card-red'><div class='card-title'>👨‍⚕️ HỒ SƠ CÁN BỘ CNV</div><div class='card-desc'>Theo dõi, cập nhật và quản lý toàn bộ danh sách hồ sơ 877 nhân sự toàn bệnh viện.</div><div class='card-link'>XEM CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
+        st.markdown("<div class='card-box card-dark'><div class='card-title'>📜 HỢP ĐỒNG LAO ĐỘNG</div><div class='card-desc'>Theo dõi hợp đồng xác định thời hạn, không xác định thời hạn và lịch sử ký.</div><div class='card-link'>QUẢN LÝ HỒ SƠ ➔</div></div>", unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("<div class='card-box card-green'><div class='card-title'>📊 BÁO CÁO & THỐNG KÊ</div><div class='card-desc'>Truy xuất dữ liệu báo cáo BYT, BVT và biến động nhân sự theo thời gian thực.</div><div class='card-link'>XEM BÁO CÁO ➔</div></div>", unsafe_allow_html=True)
+        st.markdown("<div class='card-box card-orange'><div class='card-title'>📈 NÂNG BẬC LƯƠNG & NGẠCH</div><div class='card-desc'>Quản lý nâng lương, ngạch viên chức và cảnh báo danh sách đủ điều kiện nâng lương.</div><div class='card-link'>XEM DANH SÁCH ➔</div></div>", unsafe_allow_html=True)
+
+    with col3:
+        st.markdown("<div class='card-box card-blue'><div class='card-title'>🏥 GPHN & ĐÀO TẠO CME</div><div class='card-desc'>Quản lý Chứng chỉ hành nghề và tiến độ tích lũy 48 tiết CME của Bác sĩ / Điều dưỡng.</div><div class='card-link'>XEM CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
+        st.markdown("<div class='card-box card-teal'><div class='card-title'>🩺 QUẢN LÝ BHOI & SỨC KHỎE</div><div class='card-desc'>Theo dõi chế độ bảo hiểm sở hữu, đóng xem và đợt khám sức khỏe định kỳ.</div><div class='card-link'>CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    c_left, c_mid, c_right = st.columns([1.2, 1.4, 1.4])
+    with c_left:
+        st.subheader("📌 Cảnh báo tự động")
+        st.markdown("""
+        <div class="alert-item"><span class="badge-circle badge-red">12</span><b>⏳ Sắp hết hạn HĐLĐ</b><br><small style="color: gray;">Cần tái ký / gia hạn trong 30 ngày</small></div>
+        <div class="alert-item"><span class="badge-circle badge-orange">08</span><b>💰 Đến hạn nâng bậc lương</b><br><small style="color: gray;">Đủ thời hạn nâng lương ngạch, bậc</small></div>
+        <div class="alert-item"><span class="badge-circle badge-blue">25</span><b>⚠️ Cảnh báo thiếu giờ CME</b><br><small style="color: gray;">Chưa tích lũy đủ 48 tiết / 2 năm</small></div>
+        <div class="alert-item"><span class="badge-circle badge-green">04</span><b>📜 GPHN cần cập nhật</b><br><small style="color: gray;">Bổ sung thông tin chứng chỉ mới</small></div>
+        """, unsafe_allow_html=True)
+
+    with c_mid:
+        st.subheader("📊 Nhân sự theo Trình độ")
+        data_trinh_do = pd.DataFrame({"Trình độ": ["Tiến sĩ / CKI", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp / Khác"], "Số lượng": [25, 142, 450, 180, 80]})
+        fig_bar = px.bar(data_trinh_do, x="Trình độ", y="Số lượng", text="Số lượng", color="Trình độ", color_discrete_sequence=['#ff9200', '#5c6bc0', '#26a69a', '#9ccc65', '#ec407a'])
+        fig_bar.update_layout(showlegend=False, margin=dict(l=10, r=10, t=20, b=20), height=320)
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    with c_right:
+        st.subheader("🍩 Phân loại Hợp đồng")
+        data_hd = pd.DataFrame({"Loại HĐ": ["Không xác định thời hạn", "Xác định thời hạn (1-3 năm)", "Thử việc / Ngắn hạn"], "Số lượng": [520, 310, 47]})
+        fig_donut = px.pie(data_hd, names="Loại HĐ", values="Số lượng", hole=0.5, color_discrete_sequence=['#0288d1', '#ff9200', '#00b074'])
+        fig_donut.update_layout(legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5), margin=dict(l=10, r=10, t=20, b=20), height=320)
+        st.plotly_chart(fig_donut, use_container_width=True)
+
+# ---------------------------------------------------------
+# 5. CHỨC NĂNG QUẢN LÝ CÁN BỘ CNV (THÊM, SỬA, XÓA, EXCEL)
+# ---------------------------------------------------------
+def render_quan_ly_can_bo():
+    st.markdown("---")
+    st.subheader("📁 QUẢN LÝ CÁN BỘ CNV BỆNH VIỆN BƯU ĐIỆN")
+
+    if not engine:
+        st.error("Chưa kết nối được Cơ sở dữ liệu Neon. Vui lòng kiểm tra lại cấu hình Secrets.")
+        return
+
+    # Lấy dữ liệu mới nhất
+    try:
+        df = pd.read_sql("SELECT id, ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email FROM can_bo ORDER BY id DESC", engine)
+    except Exception as e:
+        df = pd.DataFrame()
+
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📋 Danh sách & Xóa", 
+        "➕ Thêm / ✏️ Sửa Nhân sự", 
+        "📥 Tải File Mẫu & Nhập Excel", 
+        "📤 Xuất Data Excel"
+    ])
+
+    # TAB 1: DANH SÁCH VÀ XÓA CÁ NHÂN
+    with tab1:
+        st.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
+        if df.empty:
+            st.info("Chưa có dữ liệu nhân sự trong cơ sở dữ liệu. Bạn có thể thêm mới hoặc nhập từ file Excel.")
+        else:
+            st.dataframe(df, use_container_width=True)
+            
+            st.markdown("---")
+            st.markdown("##### 🗑️ **Xóa dữ liệu cá nhân**")
+            col_del1, col_del2 = st.columns([3, 1])
+            
+            # Chọn cán bộ cần xóa
+            options_del = {f"{row['ma_cb']} - {row['ho_ten']} ({row['khoa_phong']})": row['id'] for _, row in df.iterrows()}
+            selected_del = col_del1.selectbox("Chọn nhân sự muốn xóa:", list(options_del.keys()), key="select_del")
+            
+            if col_del2.button("🗑️ Xóa nhân sự", use_container_width=True):
+                target_id = options_del[selected_del]
+                with engine.connect() as conn:
+                    conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
+                    conn.commit()
+                st.success(f"Đã xóa thành công nhân sự [{selected_del}]!")
+                st.rerun()
+
+    # TAB 2: THÊM MỚI VÀ SỬA TỪNG CÁ NHÂN
+    with tab2:
+        action_mode = st.radio("Chọn thao tác:", ["➕ Thêm Nhân sự Mới", "✏️ Chỉnh sửa thông tin Cán bộ"], horizontal=True)
+        
+        if action_mode == "➕ Thêm Nhân sự Mới":
+            with st.form("form_add_member", clear_on_submit=True):
+                c1, c2 = st.columns(2)
+                ma_cb = c1.text_input("Mã Cán bộ (*)", placeholder="Ví dụ: CB001")
+                ho_ten = c2.text_input("Họ và Tên (*)", placeholder="Ví dụ: Nguyễn Văn A")
+                chuc_danh = c1.selectbox("Chức danh", ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Kỹ thuật viên", "Hành chính", "Khác"])
+                khoa_phong = c2.text_input("Khoa / Phòng", placeholder="Ví dụ: Khoa Cấp cứu")
+                trinh_do = c1.selectbox("Trình độ", ["Tiến sĩ", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp", "Khác"])
+                sdt = c2.text_input("Số điện thoại")
+                email = c1.text_input("Email")
+                
+                btn_add = st.form_submit_button("💾 Lưu Nhân sự Mới")
+                
+                if btn_add:
+                    if not ma_cb or not ho_ten:
+                        st.warning("Vui lòng nhập đầy đủ Mã Cán bộ và Họ Tên!")
+                    else:
+                        try:
+                            with engine.connect() as conn:
+                                conn.execute(text("""
+                                    INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                    VALUES (:m, :h, :c, :k, :t, :s, :e)
+                                """), {"m": ma_cb, "h": ho_ten, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email})
+                                conn.commit()
+                            st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
+                            st.rerun()
+                        except Exception as ex:
+                            st.error(f"Lỗi: Mã Cán bộ [{ma_cb}] đã tồn tại hoặc dữ liệu chưa hợp lệ!")
+
+        else: # SỬA THÔNG TIN CÁ NHÂN
+            if df.empty:
+                st.info("Chưa có dữ liệu để chỉnh sửa.")
+            else:
+                options_edit = {f"{row['ma_cb']} - {row['ho_ten']}": row['id'] for _, row in df.iterrows()}
+                selected_edit = st.selectbox("Chọn nhân sự cần sửa thông tin:", list(options_edit.keys()))
+                edit_id = options_edit[selected_edit]
+                
+                curr_row = df[df['id'] == edit_id].iloc[0]
+                
+                with st.form("form_edit_member"):
+                    c1, c2 = st.columns(2)
+                    ma_cb = c1.text_input("Mã Cán bộ (*)", value=str(curr_row['ma_cb']))
+                    ho_ten = c2.text_input("Họ và Tên (*)", value=str(curr_row['ho_ten']))
+                    
+                    list_cd = ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Kỹ thuật viên", "Hành chính", "Khác"]
+                    cd_idx = list_cd.index(curr_row['chuc_danh']) if curr_row['chuc_danh'] in list_cd else 0
+                    chuc_danh = c1.selectbox("Chức danh", list_cd, index=cd_idx)
+                    
+                    khoa_phong = c2.text_input("Khoa / Phòng", value=str(curr_row['khoa_phong'] or ''))
+                    
+                    list_td = ["Tiến sĩ", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp", "Khác"]
+                    td_idx = list_td.index(curr_row['trinh_do']) if curr_row['trinh_do'] in list_td else 0
+                    trinh_do = c1.selectbox("Trình độ", list_td, index=td_idx)
+                    
+                    sdt = c2.text_input("Số điện thoại", value=str(curr_row['so_dien_thoai'] or ''))
+                    email = c1.text_input("Email", value=str(curr_row['email'] or ''))
+                    
+                    btn_update = st.form_submit_button("🔄 Cập nhật Thông tin")
+                    
+                    if btn_update:
+                        try:
+                            with engine.connect() as conn:
+                                conn.execute(text("""
+                                    UPDATE can_bo 
+                                    SET ma_cb = :m, ho_ten = :h, chuc_danh = :c, khoa_phong = :k, 
+                                        trinh_do = :t, so_dien_thoai = :s, email = :e
+                                    WHERE id = :id
+                                """), {"m": ma_cb, "h": ho_ten, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt, "e": email, "id": edit_id})
+                                conn.commit()
+                            st.success("Đã cập nhật thông tin thành công!")
+                            st.rerun()
+                        except Exception as ex:
+                            st.error(f"Lỗi cập nhật: {ex}")
+
+    # TAB 3: TẢI FILE EXCEL MẪU & UPLOAD NHẬP DỮ LIỆU
+    with tab3:
+        col_m1, col_m2 = st.columns([1.5, 2])
+        
+        with col_m1:
+            st.markdown("##### 📥 **1. Tải về file Excel mẫu**")
+            st.caption("Mẫu chuẩn bao gồm đầy đủ tiêu đề cột để nhập liệu.")
+            
+            # Tạo DataFrame Mẫu
+            sample_df = pd.DataFrame({
+                'Mã Cán bộ': ['CB001', 'CB002'],
+                'Họ và Tên': ['Nguyễn Văn A', 'Trần Thị B'],
+                'Chức danh': ['Bác sĩ', 'Điều dưỡng'],
+                'Khoa / Phòng': ['Khoa Cấp cứu', 'Khoa Nội'],
+                'Trình độ': ['Thạc sĩ / CKI', 'Đại học'],
+                'Số điện thoại': ['0912345678', '0987654321'],
+                'Email': ['nguyenvana@gmail.com', 'tranthib@gmail.com']
+            })
+            
+            output_sample = io.BytesIO()
+            with pd.ExcelWriter(output_sample, engine='xlsxwriter') as writer:
+                sample_df.to_excel(writer, index=False, sheet_name='Mau_Nhan_Su')
+            
+            st.download_button(
+                label="📄 Tải Mẫu Excel (.xlsx)",
+                data=output_sample.getvalue(),
+                file_name="Mau_Danh_Sach_Nhan_Su.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+
+        with col_m2:
+            st.markdown("##### 📤 **2. Tải lên file Excel để nhập dữ liệu**")
+            uploaded_file = st.file_uploader("Chọn file Excel (.xlsx hoặc .xls) để upload:", type=['xlsx', 'xls'])
+            
+            if uploaded_file is not None:
+                try:
+                    df_up = pd.read_excel(uploaded_file)
+                    st.markdown("**Xem trước dữ liệu từ file Excel:**")
+                    st.dataframe(df_up.head(5), use_container_width=True)
+                    
+                    if st.button("🚀 Xác nhận Upload dữ liệu vào Hệ thống", use_container_width=True):
+                        count_success = 0
+                        count_fail = 0
+                        
+                        with engine.connect() as conn:
+                            for idx, row in df_up.iterrows():
+                                m = str(row.get('Mã Cán bộ', '')).strip()
+                                h = str(row.get('Họ và Tên', '')).strip()
+                                c = str(row.get('Chức danh', ''))
+                                k = str(row.get('Khoa / Phòng', ''))
+                                t = str(row.get('Trình độ', ''))
+                                s = str(row.get('Số điện thoại', ''))
+                                e = str(row.get('Email', ''))
+                                
+                                if m and h and m != 'nan' and h != 'nan':
+                                    try:
+                                        conn.execute(text("""
+                                            INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                            VALUES (:m, :h, :c, :k, :t, :s, :e)
+                                            ON CONFLICT (ma_cb) DO UPDATE 
+                                            SET ho_ten = EXCLUDED.ho_ten, chuc_danh = EXCLUDED.chuc_danh, 
+                                                khoa_phong = EXCLUDED.khoa_phong, trinh_do = EXCLUDED.trinh_do,
+                                                so_dien_thoai = EXCLUDED.so_dien_thoai, email = EXCLUDED.email
+                                        """), {"m": m, "h": h, "c": c, "k": k, "t": t, "s": s, "e": e})
+                                        count_success += 1
+                                    except Exception:
+                                        count_fail += 1
+                            conn.commit()
+                            
+                        st.success(f"Cập nhật thành công {count_success} bản ghi vào hệ thống!")
+                        st.rerun()
+                except Exception as e_up:
+                    st.error(f"Lỗi đọc file Excel: {e_up}")
+
+    # TAB 4: XUẤT DỮ LIỆU EXCEL
+    with tab4:
+        st.markdown("##### 📊 **Tải toàn bộ dữ liệu Cán bộ CNV ra file Excel**")
+        if df.empty:
+            st.info("Chưa có dữ liệu để xuất file.")
+        else:
+            export_df = df[['ma_cb', 'ho_ten', 'chuc_danh', 'khoa_phong', 'trinh_do', 'so_dien_thoai', 'email']].copy()
+            export_df.columns = ['Mã Cán bộ', 'Họ và Tên', 'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email']
+            
+            output_exp = io.BytesIO()
+            with pd.ExcelWriter(output_exp, engine='xlsxwriter') as writer:
+                export_df.to_excel(writer, index=False, sheet_name='Nhan_Su_BV_Buu_Dien')
+            
+            st.download_button(
+                label="📥 Tải Danh sách Nhân sự (.xlsx)",
+                data=output_exp.getvalue(),
+                file_name="Danh_Sach_Nhan_Su_BV_Buu_Dien.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+
+# ---------------------------------------------------------
+# 6. ĐIỀU HƯỚNG DASHBOARD CHÍNH
 # ---------------------------------------------------------
 def render_dashboard():
     st.sidebar.title("DANH MỤC CHỨC NĂNG")
@@ -291,89 +559,15 @@ def render_dashboard():
         st.caption("Quản trị viên Hệ thống — Bệnh viện Bưu điện")
 
     if menu == "📌 Trang chủ / Dashboard":
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown("<div class='card-box card-red'><div class='card-title'>👨‍⚕️ HỒ SƠ CÁN BỘ CNV</div><div class='card-desc'>Theo dõi, cập nhật và quản lý toàn bộ danh sách hồ sơ 877 nhân sự toàn bệnh viện.</div><div class='card-link'>XEM CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
-            st.markdown("<div class='card-box card-dark'><div class='card-title'>📜 HỢP ĐỒNG LAO ĐỘNG</div><div class='card-desc'>Theo dõi hợp đồng xác định thời hạn, không xác định thời hạn và lịch sử ký.</div><div class='card-link'>QUẢN LÝ HỒ SƠ ➔</div></div>", unsafe_allow_html=True)
-
-        with col2:
-            st.markdown("<div class='card-box card-green'><div class='card-title'>📊 BÁO CÁO & THỐNG KÊ</div><div class='card-desc'>Truy xuất dữ liệu báo cáo BYT, BVT và biến động nhân sự theo thời gian thực.</div><div class='card-link'>XEM BÁO CÁO ➔</div></div>", unsafe_allow_html=True)
-            st.markdown("<div class='card-box card-orange'><div class='card-title'>📈 NÂNG BẬC LƯƠNG & NGẠCH</div><div class='card-desc'>Quản lý nâng lương, ngạch viên chức và cảnh báo danh sách đủ điều kiện nâng lương.</div><div class='card-link'>XEM DANH SÁCH ➔</div></div>", unsafe_allow_html=True)
-
-        with col3:
-            st.markdown("<div class='card-box card-blue'><div class='card-title'>🏥 GPHN & ĐÀO TẠO CME</div><div class='card-desc'>Quản lý Chứng chỉ hành nghề và tiến độ tích lũy 48 tiết CME của Bác sĩ / Điều dưỡng.</div><div class='card-link'>XEM CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
-            st.markdown("<div class='card-box card-teal'><div class='card-title'>🩺 QUẢN LÝ BHOI & SỨC KHỎE</div><div class='card-desc'>Theo dõi chế độ bảo hiểm sở hữu, đóng xem và đợt khám sức khỏe định kỳ.</div><div class='card-link'>CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
-
-        st.markdown("---")
-
-        c_left, c_mid, c_right = st.columns([1.2, 1.4, 1.4])
-        with c_left:
-            st.subheader("📌 Cảnh báo tự động")
-            st.markdown("""
-            <div class="alert-item"><span class="badge-circle badge-red">12</span><b>⏳ Sắp hết hạn HĐLĐ</b><br><small style="color: gray;">Cần tái ký / gia hạn trong 30 ngày</small></div>
-            <div class="alert-item"><span class="badge-circle badge-orange">08</span><b>💰 Đến hạn nâng bậc lương</b><br><small style="color: gray;">Đủ thời hạn nâng lương ngạch, bậc</small></div>
-            <div class="alert-item"><span class="badge-circle badge-blue">25</span><b>⚠️ Cảnh báo thiếu giờ CME</b><br><small style="color: gray;">Chưa tích lũy đủ 48 tiết / 2 năm</small></div>
-            <div class="alert-item"><span class="badge-circle badge-green">04</span><b>📜 GPHN cần cập nhật</b><br><small style="color: gray;">Bổ sung thông tin chứng chỉ mới</small></div>
-            """, unsafe_allow_html=True)
-
-        with c_mid:
-            st.subheader("📊 Nhân sự theo Trình độ")
-            data_trinh_do = pd.DataFrame({"Trình độ": ["Tiến sĩ / CKI", "Thạc sĩ / CKI", "Đại học", "Cao đẳng", "Trung cấp / Khác"], "Số lượng": [25, 142, 450, 180, 80]})
-            fig_bar = px.bar(data_trinh_do, x="Trình độ", y="Số lượng", text="Số lượng", color="Trình độ", color_discrete_sequence=['#ff9200', '#5c6bc0', '#26a69a', '#9ccc65', '#ec407a'])
-            fig_bar.update_layout(showlegend=False, margin=dict(l=10, r=10, t=20, b=20), height=320)
-            st.plotly_chart(fig_bar, use_container_width=True)
-
-        with c_right:
-            st.subheader("🍩 Phân loại Hợp đồng")
-            data_hd = pd.DataFrame({"Loại HĐ": ["Không xác định thời hạn", "Xác định thời hạn (1-3 năm)", "Thử việc / Ngắn hạn"], "Số lượng": [520, 310, 47]})
-            fig_donut = px.pie(data_hd, names="Loại HĐ", values="Số lượng", hole=0.5, color_discrete_sequence=['#0288d1', '#ff9200', '#00b074'])
-            fig_donut.update_layout(legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5), margin=dict(l=10, r=10, t=20, b=20), height=320)
-            st.plotly_chart(fig_donut, use_container_width=True)
-
+        render_dashboard_home()
     elif menu == "👤 Hồ sơ Cán bộ CNV":
-        st.markdown("---")
-        st.subheader("📁 QUẢN LÝ CÁN BỘ CNV BỆNH VIỆN BƯU ĐIỆN")
-        tab_list, tab_add = st.tabs(["📋 Danh sách Nhân sự (Neon DB)", "➕ Thêm Nhân sự Mới"])
-
-        with tab_list:
-            if engine:
-                try:
-                    # Lấy dữ liệu an toàn không dùng ORDER BY ma_cb tránh lỗi cột không tồn tại
-                    df = pd.read_sql("SELECT * FROM can_bo", engine)
-                    if df.empty:
-                        st.info("Chưa có dữ liệu nhân sự trong CSDL Neon.")
-                    else:
-                        st.dataframe(df, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Lỗi truy vấn CSDL: {e}")
-
-        with tab_add:
-            with st.form("add_form"):
-                col1, col2 = st.columns(2)
-                ma_cb = col1.text_input("Mã Cán bộ*")
-                ho_ten = col2.text_input("Họ và Tên*")
-                chuc_danh = col1.selectbox("Chức danh", ["Bác sĩ", "Dược sĩ", "Điều dưỡng", "Hành chính"])
-                khoa_phong = col2.text_input("Khoa / Phòng")
-
-                if st.form_submit_button("Lưu Hồ Sơ"):
-                    if engine and ma_cb and ho_ten:
-                        try:
-                            with engine.connect() as conn:
-                                conn.execute(text("INSERT INTO can_bo (ma_cb, ho_ten, chuc_danh, khoa_phong) VALUES (:m, :h, :c, :k)"),
-                                             {"m": ma_cb, "h": ho_ten, "c": chuc_danh, "k": khoa_phong})
-                                conn.commit()
-                            st.success("Đã thêm cán bộ thành công!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Lỗi: {e}")
+        render_quan_ly_can_bo()
     else:
         st.markdown("---")
         st.info(f"⚙️ Chức năng **{menu}** đang được đồng bộ dữ liệu.")
 
 # ---------------------------------------------------------
-# 5. BẮT ĐẦU CHẠY APP
+# 7. CHẠY ỨNG DỤNG
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     render_login()
