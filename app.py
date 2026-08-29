@@ -388,7 +388,7 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
     
-# TAB 1: DANH SÁCH & XÓA (ĐÃ KHẮC PHỤC TRIỆT ĐỂ VIỆC RESET SELECTBOX)
+# TAB 1: DANH SÁCH & XÓA (ĐÃ KHẮC PHỤC TRIỆT ĐỂ LỖI GIỮ LẠI TÊN SAU KHI XÓA/HỦY)
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -403,6 +403,8 @@ def render_quan_ly_can_bo():
                 with engine.begin() as conn:
                     conn.execute(text("DELETE FROM can_bo;"))
                 st.cache_data.clear()
+                if "select_del_widget" in st.session_state:
+                    del st.session_state["select_del_widget"]
                 st.success("Đã làm sạch toàn bộ CSDL!")
                 st.rerun()
             except Exception as e_clean:
@@ -461,12 +463,13 @@ def render_quan_ly_can_bo():
                 options_del.append(label)
                 mapping_del[label] = row['id']
             
-            # Xử lý xóa state của selectbox nếu lệnh hủy được kích hoạt
-            if st.session_state.get("reset_selectbox_flag", False):
+            # QUAN TRỌNG: Kiểm tra và xóa ngay key trong session_state NẾU cờ hiệu reset được bật
+            if st.session_state.get("trigger_reset_selectbox", False):
                 if "select_del_widget" in st.session_state:
                     del st.session_state["select_del_widget"]
-                st.session_state["reset_selectbox_flag"] = False
+                st.session_state["trigger_reset_selectbox"] = False
 
+            # Khởi tạo selectbox với key độc lập
             selected_del_label = col_del1.selectbox(
                 "Chọn nhân sự muốn xóa:", 
                 options_del, 
@@ -475,6 +478,7 @@ def render_quan_ly_can_bo():
             
             target_id = mapping_del.get(selected_del_label, None)
             
+            # Xử lý nút Xóa nhân sự
             if col_del2.button("🗑️ Xóa nhân sự", use_container_width=True):
                 if target_id is None:
                     st.warning("⚠️ Bạn chưa chọn nhân sự nào để xóa!")
@@ -482,14 +486,18 @@ def render_quan_ly_can_bo():
                     with engine.begin() as conn:
                         conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
                     st.cache_data.clear()
-                    st.session_state["reset_selectbox_flag"] = True
+                    # Bật cờ reset và chạy lại ngay lập tức
+                    st.session_state["trigger_reset_selectbox"] = True
                     st.success(f"Đã xóa thành công [{selected_del_label}]!")
                     st.rerun()
                     
+            # Xử lý nút Hủy thao tác
             if col_del3.button("❌ Hủy thao tác", use_container_width=True):
-                st.session_state["reset_selectbox_flag"] = True  # Bật cờ yêu cầu xóa state cũ
+                # Bật cờ reset để xóa state lưu trữ của selectbox
+                st.session_state["trigger_reset_selectbox"] = True
                 st.toast("Đã hủy thao tác chọn nhân sự.")
                 st.rerun()
+    
 
     # TAB 2: THÊM & SỬA
     with tab2:
