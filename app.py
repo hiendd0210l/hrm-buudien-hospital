@@ -503,92 +503,166 @@ def render_quan_ly_can_bo():
                     st.session_state["status_message"] = "ℹ️ Đã hủy thao tác."
                     st.rerun()
     
-
-    # TAB 2: THÊM & SỬA
+   # TAB 2: THÊM & SỬA NHÂN SỰ
     with tab2:
-        action_mode = st.radio("Chọn thao tác:", ["➕ Thêm Nhân sự Mới", "✏️ Chỉnh sửa thông tin Cán bộ"], horizontal=True)
+        st.markdown("##### ➕ **Thêm mới hoặc Chỉnh sửa thông tin Cán bộ nhân viên**")
         
-        if action_mode == "➕ Thêm Nhân sự Mới":
-            with st.form("form_add_member", clear_on_submit=True):
+        # Chọn chế độ: Thêm mới hay Sửa
+        mode = st.radio("Chọn thao tác:", ["Thêm mới nhân sự", "Sửa thông tin nhân sự có sẵn"], horizontal=True)
+        
+        if mode == "Thêm mới nhân sự":
+            st.markdown("---")
+            with st.form("form_them_nhan_su", clear_on_submit=False):
                 c1, c2 = st.columns(2)
-                ma_can_bo = c1.text_input("Mã Cán bộ (*)", placeholder="Ví dụ: N0003")
-                ho_ten = c2.text_input("Họ và Tên (*)", placeholder="Ví dụ: Trần Hùng Mạnh")
-                ngay_sinh = c1.date_input("Ngày sinh", value=datetime(1967, 1, 1))
-                so_cccd = c2.text_input("Số CCCD / CMND", placeholder="Ví dụ: 12243422")
-                chuc_danh = c1.selectbox("Chức danh / Chức vụ", ["Chủ tịch HĐQL, Giám đốc", "Phó Giám đốc", "Trưởng phòng", "Phó trưởng phòng", "Nhân viên"])
-                khoa_phong = c2.text_input("Khoa / Phòng", placeholder="Ví dụ: Ban Giám đốc")
-                trinh_do = c1.selectbox("Trình độ chuyên môn", ["Thạc sĩ, Bác sĩ CKII", "Thạc sĩ kinh tế", "Kỹ sư điện tử viễn thông", "Cử nhân Quản lý kinh doanh", "Đại học", "Khác"])
-                sdt = c2.text_input("Số điện thoại", placeholder="Ví dụ: 912222606")
-                email = c1.text_input("Email")
+                with c1:
+                    new_mcb = st.text_input("Mã Cán bộ (*)", placeholder="Ví dụ: N1072")
+                    new_hoten = st.text_input("Họ và Tên (*)", placeholder="Ví dụ: Nguyễn Văn A")
+                    new_ngaysinh = st.date_input("Ngày sinh", value=None)
+                    new_cccd = st.text_input("Số CCCD", placeholder="Ví dụ: 001085123456")
+                    new_chucdanh = st.text_input("Chức danh", placeholder="Ví dụ: Bác sĩ, Điều dưỡng, Phó trưởng phòng...")
+                with c2:
+                    new_khoaphong = st.text_input("Khoa / Phòng (*)", placeholder="Ví dụ: Khoa Khám bệnh, Phòng Tổ chức...")
+                    new_trinhdo = st.text_input("Trình độ chuyên môn", placeholder="Ví dụ: Thạc sĩ, Bác sĩ CKII...")
+                    new_sdt = st.text_input("Số điện thoại", placeholder="Ví dụ: 0912222606")
+                    new_email = st.text_input("Email", placeholder="Ví dụ: example@hospital.vn")
                 
-                btn_add = st.form_submit_button("💾 Lưu Nhân sự Mới")
+                submitted_add = st.form_submit_button("💾 Lưu Nhân sự Mới", use_container_width=True)
                 
-                if btn_add:
-                    if not ma_can_bo or not ho_ten:
-                        st.warning("Vui lòng nhập đầy đủ Mã Cán bộ và Họ Tên!")
+                if submitted_add:
+                    if not new_mcb or not new_hoten or not new_khoaphong:
+                        st.error("⚠️ Vui lòng điền đầy đủ các trường bắt buộc có dấu (*): Mã cán bộ, Họ tên, Khoa/Phòng!")
                     else:
                         try:
-                            cccd_save = so_cccd.strip() if so_cccd and so_cccd.strip() else None
-                            sdt_save = sdt.strip() if sdt and sdt.strip() else None
-                            email_save = email.strip() if email and email.strip() else None
+                            # 1. Kiểm tra xem mã cán bộ đã tồn tại trong CSDL hay chưa
+                            check_query = text("SELECT COUNT(*) FROM can_bo WHERE ma_can_bo = :mcb")
+                            with engine.connect() as conn:
+                                count = conn.execute(check_query, {"mcb": new_mcb.strip()}).scalar()
                             
-                            with engine.begin() as conn:
-                                conn.execute(text("""
+                            if count > 0:
+                                st.error(f"⚠️ **Lỗi trùng lặp dữ liệu:** Mã cán bộ '{new_mcb.strip()}' đã tồn tại trong hệ thống. Vui lòng kiểm tra lại và nhập một Mã cán bộ khác!")
+                            else:
+                                # 2. Tiến hành thêm mới vào CSDL nếu chưa tồn tai
+                                insert_query = text("""
                                     INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
-                                    VALUES (:m, :h, :ns, :cccd, :c, :k, :t, :s, :e)
-                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save})
-                                
-                            st.cache_data.clear()
-                            st.success(f"Đã thêm thành công nhân sự {ho_ten}!")
-                            st.rerun()
-                        except Exception as ex:
-                            st.error(f"Lỗi thêm mới: {ex}")
-        else:
+                                    VALUES (:ma_can_bo, :ho_ten, :ngay_sinh, :so_cccd, :chuc_danh, :khoa_phong, :trinh_do, :so_dien_thoai, :email)
+                                """)
+                                with engine.begin() as conn:
+                                    conn.execute(insert_query, {
+                                        "ma_can_bo": new_mcb.strip(),
+                                        "ho_ten": new_hoten.strip(),
+                                        "ngay_sinh": new_ngaysinh,
+                                        "so_cccd": new_cccd.strip() if new_cccd else None,
+                                        "chuc_danh": new_chucdanh.strip() if new_chucdanh else None,
+                                        "khoa_phong": new_khoaphong.strip(),
+                                        "trinh_do": new_trinhdo.strip() if new_trinhdo else None,
+                                        "so_dien_thoai": new_sdt.strip() if new_sdt else None,
+                                        "email": new_email.strip() if new_email else None
+                                    })
+                                st.cache_data.clear()
+                                st.success(f"🎉 Thêm mới nhân sự [{new_mcb} - {new_hoten}] thành công!")
+                                st.rerun()
+                        except Exception as e:
+                            error_str = str(e)
+                            if "unique constraint" in error_str.lower() or "duplicate key" in error_str.lower():
+                                st.error(f"⚠️ **Lỗi trùng lặp dữ liệu:** Mã cán bộ '{new_mcb.strip()}' đã tồn tại trong hệ thống.")
+                            else:
+                                st.error(f"⚠️ Đã xảy ra lỗi khi thêm mới nhân sự: {e}")
+
+        else: # Chế độ Sửa thông tin nhân sự có sẵn
+            st.markdown("---")
             if df.empty:
-                st.info("Chưa có dữ liệu để chỉnh sửa.")
+                st.info("Chưa có dữ liệu nhân sự để chỉnh sửa.")
             else:
-                options_edit = {f"{row['ma_can_bo']} - {row['ho_ten']}": row['id'] for _, row in df.iterrows()}
-                selected_edit = st.selectbox("Chọn nhân sự cần sửa thông tin:", list(options_edit.keys()))
-                edit_id = options_edit[selected_edit]
+                # Tạo danh sách lựa chọn cán bộ cần sửa
+                options_edit = ["-- Chọn nhân sự để chỉnh sửa --"]
+                mapping_edit = {"-- Chọn nhân sự để chỉnh sửa --": None}
                 
-                curr_row = df[df['id'] == edit_id].iloc[0]
+                for _, row in df.iterrows():
+                    mcb = str(row['ma_can_bo']) if pd.notna(row['ma_can_bo']) else "N/A"
+                    hoten = str(row['ho_ten']) if pd.notna(row['ho_ten']) else "N/A"
+                    khoa = str(row['khoa_phong']) if pd.notna(row['khoa_phong']) else "Chưa phân khoa"
+                    label = f"{mcb} - {hoten} ({khoa})"
+                    options_edit.append(label)
+                    mapping_edit[label] = row['id']
                 
-                with st.form("form_edit_member"):
-                    c1, c2 = st.columns(2)
-                    ma_can_bo = c1.text_input("Mã Cán bộ (*)", value=str(curr_row['ma_can_bo'] or ''))
-                    ho_ten = c2.text_input("Họ và Tên (*)", value=str(curr_row['ho_ten'] or ''))
+                selected_edit_label = st.selectbox("Chọn nhân sự muốn chỉnh sửa:", options_edit)
+                target_edit_id = mapping_edit.get(selected_edit_label, None)
+                
+                if target_edit_id is not None:
+                    # Lấy thông tin hiện tại của nhân sự đó từ DataFrame
+                    current_row = df[df['id'] == target_edit_id].iloc[0]
                     
-                    val_ns = curr_row['ngay_sinh'] if pd.notna(curr_row['ngay_sinh']) else datetime(1990, 1, 1)
-                    ngay_sinh = c1.date_input("Ngày sinh", value=val_ns)
-                    so_cccd = c2.text_input("Số CCCD / CMND", value=str(curr_row['so_cccd'] or ''))
-                    
-                    chuc_danh = c1.text_input("Chức vụ", value=str(curr_row['chuc_danh'] or ''))
-                    khoa_phong = c1.text_input("Khoa / Phòng", value=str(curr_row['khoa_phong'] or ''))
-                    trinh_do = c2.text_input("Trình độ chuyên môn", value=str(curr_row['trinh_do'] or ''))
-                    
-                    sdt = c1.text_input("Số điện thoại", value=str(curr_row['so_dien_thoai'] or ''))
-                    email = c2.text_input("Email", value=str(curr_row['email'] or ''))
-                    
-                    btn_update = st.form_submit_button("🔄 Cập nhật Thông tin")
-                    
-                    if btn_update:
-                        try:
-                            cccd_save = so_cccd.strip() if so_cccd and so_cccd.strip() else None
-                            sdt_save = sdt.strip() if sdt and sdt.strip() else None
-                            email_save = email.strip() if email and email.strip() else None
-                            with engine.begin() as conn:
-                                conn.execute(text("""
-                                    UPDATE can_bo 
-                                    SET ma_can_bo = :m, ho_ten = :h, ngay_sinh = :ns, so_cccd = :cccd, chuc_danh = :c, 
-                                        khoa_phong = :k, trinh_do = :t, so_dien_thoai = :s, email = :e
-                                    WHERE id = :id
-                                """), {"m": ma_can_bo.strip(), "h": ho_ten.strip(), "ns": ngay_sinh, "cccd": cccd_save, "c": chuc_danh, "k": khoa_phong, "t": trinh_do, "s": sdt_save, "e": email_save, "id": edit_id})
-                                
-                            st.cache_data.clear()
-                            st.success("Đã cập nhật thông tin thành công!")
-                            st.rerun()
-                        except Exception as ex:
-                            st.error(f"Lỗi cập nhật: {ex}")
+                    with st.form("form_sua_nhan_su"):
+                        st.markdown(f"Đang chỉnh sửa cho: **{selected_edit_label}**")
+                        sc1, sc2 = st.columns(2)
+                        
+                        # Xử lý giá trị ngày sinh mặc định an toàn
+                        default_dob = None
+                        if pd.notna(current_row.get('ngay_sinh')):
+                            default_dob = pd.to_datetime(current_row['ngay_sinh']).date()
+
+                        with sc1:
+                            edit_mcb = st.text_input("Mã Cán bộ (*)", value=str(current_row.get('ma_can_bo', '')))
+                            edit_hoten = st.text_input("Họ và Tên (*)", value=str(current_row.get('ho_ten', '')))
+                            edit_ngaysinh = st.date_input("Ngày sinh", value=default_dob)
+                            edit_cccd = st.text_input("Số CCCD", value=str(current_row.get('so_cccd', '')) if pd.notna(current_row.get('so_cccd')) else '')
+                            edit_chucdanh = st.text_input("Chức danh", value=str(current_row.get('chuc_danh', '')) if pd.notna(current_row.get('chuc_danh')) else '')
+                        with sc2:
+                            edit_khoaphong = st.text_input("Khoa / Phòng (*)", value=str(current_row.get('khoa_phong', '')))
+                            edit_trinhdo = st.text_input("Trình độ chuyên môn", value=str(current_row.get('trinh_do', '')) if pd.notna(current_row.get('trinh_do')) else '')
+                            edit_sdt = st.text_input("Số điện thoại", value=str(current_row.get('so_dien_thoai', '')) if pd.notna(current_row.get('so_dien_thoai')) else '')
+                            edit_email = st.text_input("Email", value=str(current_row.get('email', '')) if pd.notna(current_row.get('email')) else '')
+                        
+                        submitted_update = st.form_submit_button("💾 Cập nhật thông tin", use_container_width=True)
+                        
+                        if submitted_update:
+                            if not edit_mcb or not edit_hoten or not edit_khoaphong:
+                                st.error("⚠️ Vui lòng điền đầy đủ các trường bắt buộc có dấu (*): Mã cán bộ, Họ tên, Khoa/Phòng!")
+                            else:
+                                try:
+                                    # Kiểm tra xem mã mới có bị trùng với người khác hay không (trừ chính nhân sự này ra)
+                                    check_dup_query = text("SELECT COUNT(*) FROM can_bo WHERE ma_can_bo = :mcb AND id != :id")
+                                    with engine.connect() as conn:
+                                        dup_count = conn.execute(check_dup_query, {"mcb": edit_mcb.strip(), "id": target_edit_id}).scalar()
+                                    
+                                    if dup_count > 0:
+                                        st.error(f"⚠️ Mã cán bộ '{edit_mcb.strip()}' đã được sử dụng bởi nhân sự khác trong hệ thống!")
+                                    else:
+                                        update_query = text("""
+                                            UPDATE can_bo 
+                                            SET ma_can_bo = :ma_can_bo, 
+                                                ho_ten = :ho_ten, 
+                                                ngay_sinh = :ngay_sinh, 
+                                                so_cccd = :so_cccd, 
+                                                chuc_danh = :chuc_danh, 
+                                                khoa_phong = :khoa_phong, 
+                                                trinh_do = :trinh_do, 
+                                                so_dien_thoai = :so_dien_thoai, 
+                                                email = :email
+                                            WHERE id = :id
+                                        """)
+                                        with engine.begin() as conn:
+                                            conn.execute(update_query, {
+                                                "ma_can_bo": edit_mcb.strip(),
+                                                "ho_ten": edit_hoten.strip(),
+                                                "ngay_sinh": edit_ngaysinh,
+                                                "so_cccd": edit_cccd.strip() if edit_cccd else None,
+                                                "chuc_danh": edit_chucdanh.strip() if edit_chucdanh else None,
+                                                "khoa_phong": edit_khoaphong.strip(),
+                                                "trinh_do": edit_trinhdo.strip() if edit_trinhdo else None,
+                                                "so_dien_thoai": edit_sdt.strip() if edit_sdt else None,
+                                                "email": edit_email.strip() if edit_email else None,
+                                                "id": target_edit_id
+                                            })
+                                        st.cache_data.clear()
+                                        st.success(f"✅ Đã cập nhật thành công thông tin cho [{edit_mcb} - {edit_hoten}]!")
+                                        st.rerun()
+                                except Exception as e:
+                                    error_str = str(e)
+                                    if "unique constraint" in error_str.lower() or "duplicate key" in error_str.lower():
+                                        st.error(f"⚠️ Lỗi trùng lặp: Mã cán bộ '{edit_mcb.strip()}' đã tồn tại.")
+                                    else:
+                                        st.error(f"⚠️ Đã xảy ra lỗi khi cập nhật: {e}")
 
    # TAB 3: TẢI MẪU & UPLOAD EXCEL (CHỐNG TRÙNG LẶP & HIỂN THỊ THÔNG BÁO RÕ RÀNG)
     with tab3:
