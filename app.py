@@ -229,47 +229,113 @@ def render_dashboard_home():
         st.markdown("<div class='card-box card-blue'><div class='card-title'>🏥 GPHN & ĐÀO TẠO CME</div><div class='card-desc'>Quản lý Chứng chỉ hành nghề và tiến độ tích lũy 48 tiết CME của Bác sĩ / Điều dưỡng.</div><div class='card-link'>XEM CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
         st.markdown("<div class='card-box card-teal'><div class='card-title'>🩺 QUẢN LÝ BHOI & SỨC KHỎE</div><div class='card-desc'>Theo dõi chế độ bảo hiểm sở hữu, đóng xem và đợt khám sức khỏe định kỳ.</div><div class='card-link'>CHI TIẾT ➔</div></div>", unsafe_allow_html=True)
     
+    # PHẦN DƯỚI TRANG CHỦ: 3 CỘT (CẢNH BÁO TỰ ĐỘNG - NHÂN SỰ THEO TRÌNH ĐỘ - PHÂN LOẠI HỢP ĐỒNG)
     st.markdown("---")
-    c_left, c_mid, c_right = st.columns([1.2, 1.4, 1.4])
-    with c_left:
-        st.subheader("📌 Cảnh báo tự động")
-        st.markdown(f"""
-        <div class="alert-item"><span class="badge-circle badge-red">{max(1, int(total_staff * 0.05))}</span><b>⏳ Sắp hết hạn HĐLĐ</b><br><small style="color: gray;">Cần tái ký / gia hạn trong 30 ngày</small></div>
-        <div class="alert-item"><span class="badge-circle badge-orange">{max(1, int(total_staff * 0.03))}</span><b>💰 Đến hạn nâng bậc lương</b><br><small style="color: gray;">Đủ thời hạn nâng lương ngạch, bậc</small></div>
-        <div class="alert-item"><span class="badge-circle badge-blue">{max(1, int(total_staff * 0.08))}</span><b>⚠️ Cảnh báo thiếu giờ CME</b><br><small style="color: gray;">Chưa tích lũy đủ 48 tiết / 2 năm</small></div>
-        <div class="alert-item"><span class="badge-circle badge-green">{max(1, int(total_staff * 0.01))}</span><b>📜 GPHN cần cập nhật</b><br><small style="color: gray;">Bổ sung thông tin chứng chỉ mới</small></div>
-        """, unsafe_allow_html=True)
+    
+    col_dash1, col_dash2, col_dash3 = st.columns([1.1, 1, 1], gap="medium")
+    
+    # --- CỘT 1: CẢNH BÁO TỰ ĐỘNG ---
+    with col_dash1:
+        st.markdown("##### 📌 **Cảnh báo tự động**")
         
-    with c_mid:
-        st.subheader("📊 Nhân sự theo Trình độ")
-        if not df_db.empty and 'trinh_do' in df_db.columns and df_db['trinh_do'].notna().sum() > 0:
-            df_td = df_db['trinh_do'].fillna('Chưa cập nhật').value_counts().reset_index()
-            df_td.columns = ['Trình độ', 'Số lượng']
-        else:
-            df_td = pd.DataFrame({"Trình độ": ["Đại học / Sau đại học", "Cao đẳng", "Trung cấp / Khác"], "Số lượng": [max(1, total_staff), 0, 0]})
-            
-        fig_bar = px.bar(df_td, x="Trình độ", y="Số lượng", text="Số lượng", color="Trình độ", color_discrete_sequence=['#ff9200', '#5c6bc0', '#26a69a', '#9ccc65', '#ec407a'])
-        fig_bar.update_layout(showlegend=False, margin=dict(l=10, r=10, t=20, b=20), height=320)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        # Hàm hiển thị từng dòng cảnh báo dạng card nhỏ gọn
+        def render_alert_card(title, desc, count, color_border):
+            st.markdown(f"""
+                <div style="
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: space-between; 
+                    background-color: #ffffff; 
+                    padding: 10px 12px; 
+                    border-radius: 8px; 
+                    margin-bottom: 8px; 
+                    border-left: 5px solid {color_border};
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                ">
+                    <div>
+                        <div style="font-weight: 600; font-size: 13.5px; color: #333;">{title}</div>
+                        <div style="font-size: 11.5px; color: #666; margin-top: 2px;">{desc}</div>
+                    </div>
+                    <div style="
+                        background-color: #fff5f5; 
+                        color: {color_border}; 
+                        font-weight: bold; 
+                        font-size: 14px; 
+                        padding: 4px 10px; 
+                        border-radius: 6px;
+                        border: 1px solid {color_border}33;
+                    ">
+                        {count}
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
+        render_alert_card("⏰ Sắp hết hạn HĐLĐ", "Cần ký lại / gia hạn trong 30 ngày", "12", "#ff4d4f")
+        render_alert_card("💰 Đến hạn nâng bậc lương", "Đủ thời hạn xét nâng ngạch, bậc", "08", "#fa8c16")
+        render_alert_card("⚠️ Cảnh báo thiếu giờ CME", "Chưa tích lũy đủ 48 tiết / 2 năm", "25", "#1890ff")
+        render_alert_card("📜 GPHN cần cập nhật", "Bổ sung thông tin chứng chỉ mới", "04", "#52c41a")
+
+    # --- CỘT 2: NHÂN SỰ THEO TRÌNH ĐỘ (Dùng Plotly Bar Chart) ---
+    with col_dash2:
+        st.markdown("##### 📊 **Nhân sự theo Trình độ**")
         
-    with c_right:
-        st.subheader("🍩 Phân loại Khoa phòng / Chức danh")
-        if not df_db.empty and 'khoa_phong' in df_db.columns and df_db['khoa_phong'].notna().sum() > 0:
-            df_kp = df_db['khoa_phong'].fillna('Chưa phân khoa').value_counts().reset_index()
-            df_kp.columns = ['Khoa_Phong', 'Số lượng']
-            # Lấy top 5 khoa phòng đông nhất để biểu đồ tròn hiển thị đẹp
-            if len(df_kp) > 5:
-                top_kp = df_kp.head(4)
-                other_sum = df_kp.iloc[4:]['Số lượng'].sum()
-                df_donut = pd.concat([top_kp, pd.DataFrame([{'Khoa_Phong': 'Khác', 'Số lượng': other_sum}])], ignore_index=True)
-            else:
-                df_donut = df_kp
-        else:
-            df_donut = pd.DataFrame({"Khoa_Phong": ["Chưa cập nhật"], "Số lượng": [max(1, total_staff)]})
-            
-        fig_donut = px.pie(df_donut, names="Khoa_Phong", values="Số lượng", hole=0.5, color_discrete_sequence=['#0288d1', '#ff9200', '#00b074', '#e53935', '#9c27b0'])
-        fig_donut.update_layout(legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5), margin=dict(l=10, r=10, t=20, b=20), height=320)
-        st.plotly_chart(fig_donut, use_container_width=True)
+        import plotly.express as px
+        import pandas as pd
+
+        # Dữ liệu mẫu minh họa (có thể thay thế bằng dữ liệu truy vấn từ CSDL của bạn)
+        df_trinh_do = pd.DataFrame({
+            'Trình độ': ['Tiến sĩ/CKI', 'Thạc sĩ/CKI', 'Đại học', 'Cao đẳng', 'Trung cấp/Khác'],
+            'Số lượng': [25, 142, 450, 180, 80]
+        })
+        
+        fig_td = px.bar(
+            df_trinh_do, 
+            x='Trình độ', 
+            y='Số lượng',
+            text='Số lượng',
+            color='Trình độ',
+            color_discrete_sequence=['#fa8c16', '#5c6bc0', '#26a69a', '#9ccc65', '#ab47bc']
+        )
+        fig_td.update_traces(textposition='outside', textfont_size=11)
+        fig_td.update_layout(
+            margin=dict(t=10, b=10, l=10, r=10),
+            height=260,
+            showlegend=False,
+            xaxis=dict(title='', tickfont=dict(size=10)),
+            yaxis=dict(title='', showgrid=True, gridcolor='#f0f0f0')
+        )
+        st.plotly_chart(fig_td, use_container_width=True, config={'displayModeBar': False})
+
+    # --- CỘT 3: PHÂN LOẠI HỢP ĐỒNG (Dùng Plotly Donut Chart) ---
+    with col_dash3:
+        st.markdown("##### 🍩 **Phân loại Hợp đồng**")
+        
+        df_hd = pd.DataFrame({
+            'Loại hợp đồng': ['Không xác định thời hạn', 'Xác định thời hạn (1-3 năm)', 'Thử việc / Ngắn hạn'],
+            'Số lượng': [520, 310, 47]
+        })
+        
+        fig_hd = px.pie(
+            df_hd, 
+            names='Loại hợp đồng', 
+            values='Số lượng',
+            hole=0.55,
+            color_discrete_sequence=['#1890ff', '#fa8c16', '#00b96b']
+        )
+        fig_hd.update_traces(textposition='inside', textinfo='percent+value')
+        fig_hd.update_layout(
+            margin=dict(t=10, b=10, l=10, r=10),
+            height=260,
+            legend=dict(
+                orientation="h", 
+                yanchor="bottom", 
+                y=-0.3, 
+                xanchor="center", 
+                x=0.5,
+                font=dict(size=10)
+            )
+        )
+        st.plotly_chart(fig_hd, use_container_width=True, config={'displayModeBar': False})
 
 # ---------------------------------------------------------
 # 5. QUẢN LÝ CÁN BỘ CNV
