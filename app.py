@@ -503,16 +503,60 @@ def render_quan_ly_can_bo():
                     st.session_state["status_message"] = "ℹ️ Đã hủy thao tác."
                     st.rerun()
     
-  # TAB 2: THÊM & SỬA NHÂN SỰ (HOÀN THIỆN ĐỦ TRƯỜNG, ĐỊNH DẠNG NGÀY SINH & NÚT OK)
+ # TAB 2: THÊM & SỬA NHÂN SỰ (DÙNG SELECTBOX DANH MỤC VÀ DATE_INPUT LỊCH CHỌN)
     with tab2:
         st.markdown("##### ➕ **Thêm mới hoặc Chỉnh sửa thông tin Cán bộ nhân viên**")
         
         mode = st.radio("Chọn thao tác:", ["Thêm mới nhân sự", "Sửa thông tin nhân sự có sẵn"], horizontal=True, key="mode_them_sua")
         
+        # Danh mục tùy chọn chuẩn hệ thống (có thể điều chỉnh thêm bớt danh sách tại đây)
+        danh_muc_khoa_phong = [
+            "-- Chọn Khoa / Phòng --",
+            "Phòng Nhân sự - Tổng hợp",
+            "Phòng Kế hoạch Tổng hợp",
+            "Phòng Tài chính Kế toán",
+            "Khoa Khám bệnh",
+            "Khoa Nội tổng hợp",
+            "Khoa Ngoại tổng hợp",
+            "Khoa Cấp cứu - Hồi sức tích cực",
+            "Khoa Nhi",
+            "Khoa Phụ sản",
+            "Khoa Chẩn đoán hình ảnh",
+            "Khoa Xét nghiệm",
+            "Khoa Dược",
+            "Khoa Kiểm soát nhiễm khuẩn"
+        ]
+        
+        danh_muc_trinh_do = [
+            "-- Chọn Trình độ chuyên môn --",
+            "Tiến sĩ, Bác sĩ CKI",
+            "Thạc sĩ, Bác sĩ CKII",
+            "Bác sĩ CKII",
+            "Bác sĩ CKI",
+            "Bác sĩ đa khoa",
+            "Dược sĩ đại học",
+            "Cử nhân điều dưỡng",
+            "Cao đẳng điều dưỡng",
+            "Trung cấp",
+            "Khác"
+        ]
+        
+        danh_muc_chuc_danh = [
+            "-- Chọn Chức danh --",
+            "Ban Giám đốc",
+            "Trưởng khoa / Trưởng phòng",
+            "Phó trưởng khoa / Phó phòng",
+            "Bác sĩ",
+            "Điều dưỡng trưởng",
+            "Điều dưỡng viên",
+            "Kỹ thuật viên",
+            "Dược sĩ",
+            "Nhân viên hành chính"
+        ]
+
         if mode == "Thêm mới nhân sự":
             st.markdown("---")
             
-            # Kiểm tra trạng thái thông báo thành công sau khi lưu
             if st.session_state.get("add_success_msg", ""):
                 st.success(st.session_state["add_success_msg"])
                 if st.button("OK, Trở về màn hình ban đầu", key="btn_ok_add_success"):
@@ -524,34 +568,33 @@ def render_quan_ly_can_bo():
                     with c1:
                         new_mcb = st.text_input("Mã Cán bộ (*)", placeholder="Ví dụ: N1971")
                         new_hoten = st.text_input("Họ và Tên (*)", placeholder="Ví dụ: Khuất Duy Tiến")
-                        # Yêu cầu định dạng DD/MM/YYYY để nhập được từ năm 1945 trở lại
-                        new_ngaysinh_str = st.text_input("Ngày sinh (Định dạng: DD/MM/YYYY)", placeholder="Ví dụ: 15/08/1965")
+                        
+                        # Sử dụng date_input với giới hạn năm từ 1930 đến hiện tại
+                        from datetime import date
+                        new_ngaysinh = st.date_input(
+                            "Ngày sinh", 
+                            value=date(1975, 1, 1), 
+                            min_value=date(1930, 1, 1), 
+                            max_value=date.today(),
+                            format="DD/MM/YYYY"
+                        )
+                        
                         new_cccd = st.text_input("Số CCCD", placeholder="Ví dụ: 001085123456")
-                        new_chucdanh = st.text_input("Chức danh", placeholder="Ví dụ: Bác sĩ, Trưởng khoa...")
+                        new_chucdanh = st.selectbox("Chức danh", danh_muc_chuc_danh)
+                        
                     with c2:
-                        new_khoaphong = st.text_input("Khoa / Phòng (*)", placeholder="Ví dụ: Phòng Nhân sự - Tổng hợp")
-                        new_trinhdo = st.text_input("Trình độ chuyên môn", placeholder="Ví dụ: Thạc sĩ, Bác sĩ CKI...")
+                        new_khoaphong = st.selectbox("Khoa / Phòng (*)", danh_muc_khoa_phong)
+                        new_trinhdo = st.selectbox("Trình độ chuyên môn", danh_muc_trinh_do)
                         new_sdt = st.text_input("Số điện thoại", placeholder="Ví dụ: 0912222606")
                         new_email = st.text_input("Email", placeholder="Ví dụ: example@hospital.vn")
                     
                     submitted_add = st.form_submit_button("💾 Lưu Nhân sự Mới", use_container_width=True)
                     
                     if submitted_add:
-                        if not new_mcb or not new_hoten or not new_khoaphong:
-                            st.error("⚠️ Vui lòng điền đầy đủ các trường bắt buộc có dấu (*): Mã cán bộ, Họ tên, Khoa/Phòng!")
+                        if not new_mcb or not new_hoten or new_khoaphong == "-- Chọn Khoa / Phòng --":
+                            st.error("⚠️ Vui lòng điền đầy đủ các trường bắt buộc có dấu (*): Mã cán bộ, Họ tên và chọn Khoa/Phòng hợp lệ!")
                         else:
-                            # Xử lý và kiểm tra định dạng ngày sinh DD/MM/YYYY
-                            parsed_dob = None
-                            if new_ngaysinh_str.strip():
-                                try:
-                                    from datetime import datetime
-                                    parsed_dob = datetime.strptime(new_ngaysinh_str.strip(), "%d/%m/%Y").date()
-                                except ValueError:
-                                    st.error("⚠️ Định dạng ngày sinh không hợp lệ! Vui lòng nhập đúng định dạng DD/MM/YYYY (Ví dụ: 25/12/1950)")
-                                    st.stop()
-
                             try:
-                                # Kiểm tra trùng mã cán bộ
                                 check_query = text("SELECT COUNT(*) FROM can_bo WHERE ma_can_bo = :mcb")
                                 with engine.connect() as conn:
                                     count = conn.execute(check_query, {"mcb": new_mcb.strip()}).scalar()
@@ -567,11 +610,11 @@ def render_quan_ly_can_bo():
                                         conn.execute(insert_query, {
                                             "ma_can_bo": new_mcb.strip(),
                                             "ho_ten": new_hoten.strip(),
-                                            "ngay_sinh": parsed_dob,
+                                            "ngay_sinh": new_ngaysinh,
                                             "so_cccd": new_cccd.strip() if new_cccd else None,
-                                            "chuc_danh": new_chucdanh.strip() if new_chucdanh else None,
-                                            "khoa_phong": new_khoaphong.strip(),
-                                            "trinh_do": new_trinhdo.strip() if new_trinhdo else None,
+                                            "chuc_danh": new_chucdanh if new_chucdanh != "-- Chọn Chức danh --" else None,
+                                            "khoa_phong": new_khoaphong,
+                                            "trinh_do": new_trinhdo if new_trinhdo != "-- Chọn Trình độ chuyên môn --" else None,
                                             "so_dien_thoai": new_sdt.strip() if new_sdt else None,
                                             "email": new_email.strip() if new_email else None
                                         })
@@ -579,11 +622,7 @@ def render_quan_ly_can_bo():
                                     st.session_state["add_success_msg"] = f"🎉 Thêm mới nhân sự [{new_mcb} - {new_hoten}] thành công!"
                                     st.rerun()
                             except Exception as e:
-                                error_str = str(e)
-                                if "unique constraint" in error_str.lower() or "duplicate key" in error_str.lower():
-                                    st.error(f"⚠️ Mã cán bộ '{new_mcb.strip()}' đã tồn tại trong hệ thống.")
-                                else:
-                                    st.error(f"⚠️ Đã xảy ra lỗi: {e}")
+                                st.error(f"⚠️ Đã xảy ra lỗi: {e}")
 
         else: # Chế độ Sửa thông tin nhân sự có sẵn
             st.markdown("---")
@@ -607,13 +646,23 @@ def render_quan_ly_can_bo():
                 if target_edit_id is not None:
                     current_row = df[df['id'] == target_edit_id].iloc[0]
                     
-                    # Chuyển đổi ngày sinh sang chuỗi DD/MM/YYYY để hiển thị vào text_input
-                    default_dob_str = ""
+                    # Thiết lập giá trị ngày sinh mặc định an toàn cho date_input
+                    default_dob = date(1975, 1, 1)
                     if pd.notna(current_row.get('ngay_sinh')):
                         try:
-                            default_dob_str = pd.to_datetime(current_row['ngay_sinh']).strftime('%d/%m/%Y')
+                            default_dob = pd.to_datetime(current_row['ngay_sinh']).date()
                         except:
-                            default_dob_str = ""
+                            pass
+
+                    # Tìm vị trí index mặc định cho các selectbox danh mục
+                    val_kp = current_row.get('khoa_phong', '')
+                    idx_kp = danh_muc_khoa_phong.index(val_kp) if val_kp in danh_muc_khoa_phong else 0
+
+                    val_td = current_row.get('trinh_do', '')
+                    idx_td = danh_muc_trinh_do.index(val_td) if val_td in danh_muc_trinh_do else 0
+
+                    val_cd = current_row.get('chuc_danh', '')
+                    idx_cd = danh_muc_chuc_danh.index(val_cd) if val_cd in danh_muc_chuc_danh else 0
 
                     with st.form("form_sua_nhan_su"):
                         st.markdown(f"Đang chỉnh sửa cho: **{selected_edit_label}**")
@@ -622,30 +671,21 @@ def render_quan_ly_can_bo():
                         with sc1:
                             edit_mcb = st.text_input("Mã Cán bộ (*)", value=str(current_row.get('ma_can_bo', '')), placeholder="Ví dụ: N1971")
                             edit_hoten = st.text_input("Họ và Tên (*)", value=str(current_row.get('ho_ten', '')), placeholder="Ví dụ: Khuất Duy Tiến")
-                            edit_ngaysinh_str = st.text_input("Ngày sinh (Định dạng: DD/MM/YYYY)", value=default_dob_str, placeholder="Ví dụ: 15/08/1965")
+                            edit_ngaysinh = st.date_input("Ngày sinh", value=default_dob, min_value=date(1930, 1, 1), max_value=date.today(), format="DD/MM/YYYY")
                             edit_cccd = st.text_input("Số CCCD", value=str(current_row.get('so_cccd', '')) if pd.notna(current_row.get('so_cccd')) else '', placeholder="Ví dụ: 001085123456")
-                            edit_chucdanh = st.text_input("Chức danh", value=str(current_row.get('chuc_danh', '')) if pd.notna(current_row.get('chuc_danh')) else '', placeholder="Ví dụ: Bác sĩ...")
+                            edit_chucdanh = st.selectbox("Chức danh", danh_muc_chuc_danh, index=idx_cd)
                         with sc2:
-                            edit_khoaphong = st.text_input("Khoa / Phòng (*)", value=str(current_row.get('khoa_phong', '')), placeholder="Ví dụ: Phòng Nhân sự")
-                            edit_trinhdo = st.text_input("Trình độ chuyên môn", value=str(current_row.get('trinh_do', '')) if pd.notna(current_row.get('trinh_do')) else '', placeholder="Ví dụ: Thạc sĩ...")
+                            edit_khoaphong = st.selectbox("Khoa / Phòng (*)", danh_muc_khoa_phong, index=idx_kp)
+                            edit_trinhdo = st.selectbox("Trình độ chuyên môn", danh_muc_trinh_do, index=idx_td)
                             edit_sdt = st.text_input("Số điện thoại", value=str(current_row.get('so_dien_thoai', '')) if pd.notna(current_row.get('so_dien_thoai')) else '', placeholder="Ví dụ: 0912222606")
                             edit_email = st.text_input("Email", value=str(current_row.get('email', '')) if pd.notna(current_row.get('email')) else '', placeholder="Ví dụ: email@hospital.vn")
                         
                         submitted_update = st.form_submit_button("💾 Cập nhật thông tin", use_container_width=True)
                         
                         if submitted_update:
-                            if not edit_mcb or not edit_hoten or not edit_khoaphong:
-                                st.error("⚠️ Vui lòng điền đầy đủ các trường bắt buộc có dấu (*): Mã cán bộ, Họ tên, Khoa/Phòng!")
+                            if not edit_mcb or not edit_hoten or edit_khoaphong == "-- Chọn Khoa / Phòng --":
+                                st.error("⚠️ Vui lòng điền đầy đủ các trường bắt buộc có dấu (*): Mã cán bộ, Họ tên và chọn Khoa/Phòng hợp lệ!")
                             else:
-                                parsed_edit_dob = None
-                                if edit_ngaysinh_str.strip():
-                                    try:
-                                        from datetime import datetime
-                                        parsed_edit_dob = datetime.strptime(edit_ngaysinh_str.strip(), "%d/%m/%Y").date()
-                                    except ValueError:
-                                        st.error("⚠️ Định dạng ngày sinh không hợp lệ! Vui lòng nhập đúng định dạng DD/MM/YYYY")
-                                        st.stop()
-
                                 try:
                                     check_dup_query = text("SELECT COUNT(*) FROM can_bo WHERE ma_can_bo = :mcb AND id != :id")
                                     with engine.connect() as conn:
@@ -671,11 +711,11 @@ def render_quan_ly_can_bo():
                                             conn.execute(update_query, {
                                                 "ma_can_bo": edit_mcb.strip(),
                                                 "ho_ten": edit_hoten.strip(),
-                                                "ngay_sinh": parsed_edit_dob,
+                                                "ngay_sinh": edit_ngaysinh,
                                                 "so_cccd": edit_cccd.strip() if edit_cccd else None,
-                                                "chuc_danh": edit_chucdanh.strip() if edit_chucdanh else None,
-                                                "khoa_phong": edit_khoaphong.strip(),
-                                                "trinh_do": edit_trinhdo.strip() if edit_trinhdo else None,
+                                                "chuc_danh": edit_chucdanh if edit_chucdanh != "-- Chọn Chức danh --" else None,
+                                                "khoa_phong": edit_khoaphong,
+                                                "trinh_do": edit_trinhdo if edit_trinhdo != "-- Chọn Trình độ chuyên môn --" else None,
                                                 "so_dien_thoai": edit_sdt.strip() if edit_sdt else None,
                                                 "email": edit_email.strip() if edit_email else None,
                                                 "id": target_edit_id
