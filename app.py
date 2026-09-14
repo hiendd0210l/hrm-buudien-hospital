@@ -262,21 +262,337 @@ def render_dashboard_home():
         st.plotly_chart(fig_hd, use_container_width=True, config={'displayModeBar': False})
 
 # ---------------------------------------------------------
-# 5. QUẢN LÝ CÁN BỘ CNV
+# 5. QUẢN LÝ CÁN BỘ CNV (ĐẦY ĐỦ 4 TABS)
 # ---------------------------------------------------------
 def render_quan_ly_can_bo():
     st.markdown("---")
     st.subheader("📁 QUẢN LÝ CÁN BỘ CNV BỆNH VIỆN BƯU ĐIỆN")
     if not engine:
-        st.error("Chưa kết nối được Cơ sở dữ liệu Neon.")
+        st.error("Chưa kết nối được Cơ sở dữ liệu Neon. Vui lòng kiểm tra lại cấu hình Secrets.")
         return
         
     df = load_data_from_db()
-    st.success(f"📋 **Tổng số nhân sự hiện có trong CSDL:** **{len(df)}** cán bộ, nhân viên.")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    total_count = len(df)
+    st.success(f"📋 **Tổng số nhân sự hiện có trong CSDL:** **{total_count}** cán bộ, nhân viên.")
+    
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📋 Danh sách & Xóa", 
+        "➕ Thêm / ✏️ Sửa Nhân sự", 
+        "📥 Tải File Mẫu & Nhập Excel", 
+        "📤 Xuất Data Excel"
+    ])
+    
+    # TAB 1: DANH SÁCH & XÓA
+    with tab1:
+        col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
+        col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
+        
+        if col_t2.button("🔄 Tải lại dữ liệu", use_container_width=True):
+            st.cache_data.clear()
+            st.toast("🔄 Đã làm mới dữ liệu từ CSDL thành công!")
+            st.rerun()
+            
+        if col_t3.button("🧹 Xóa hết dữ liệu", use_container_width=True):
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text("DELETE FROM can_bo;"))
+                st.cache_data.clear()
+                if "select_del_widget" in st.session_state:
+                    del st.session_state["select_del_widget"]
+                st.success("Đã làm sạch toàn bộ CSDL!")
+                st.rerun()
+            except Exception as e_clean:
+                st.error(f"Lỗi khi làm sạch CSDL: {e_clean}")
+                
+        if df.empty:
+            st.info("Chưa có dữ liệu nhân sự trong CSDL. Bạn có thể thêm mới hoặc nhập từ file Excel mẫu.")
+        else:
+            def get_department_priority(kp):
+                if not kp or pd.isna(kp):
+                    return 99
+                s = str(kp).lower().strip()
+                if any(x in s for x in ['giám đốc', 'hđql', 'ban giám đốc']):
+                    return 1
+                if any(x in s for x in ['phòng', 'tổ chức', 'kế hoạch', 'tài chính', 'điều dưỡng', 'hành chính', 'quản trị', 'vật tư', 'cntt']):
+                    return 2
+                if any(x in s for x in ['ngoại', 'nội', 'sản', 'nhi', 'cấp cứu', 'hồi sức', 'y học cổ truyền', 'phục hồi chức năng', 'truyền nhiễm', 'da liễu', 'ung bướu']):
+                    return 3
+                if 'khám' in s:
+                    return 4
+                if any(x in s for x in ['mắt', 'tai mũi họng', 'răng hàm mặt', 'rhm', 'tmh']):
+                    return 5
+                if any(x in s for x in ['chẩn đoán hình ảnh', 'xét nghiệm', 'nội soi', 'thăm dò chức năng', 'gây mê', 'dược', 'kiểm soát nhiễm khuẩn', 'vi sinh', 'sinh hóa']):
+                    return 6
+                if 'trung tâm' in s:
+                    return 7
+                return 50
+
+            df_sorted = df.copy()
+            df_sorted['priority'] = df_sorted['khoa_phong'].apply(get_department_priority)
+            df_sorted = df_sorted.sort_values(by=['priority', 'khoa_phong', 'ho_ten'], ascending=[True, True, True])
+            
+            display_df = df_sorted.drop(columns=['id', 'priority']).copy()
+            if 'ngay_sinh' in display_df.columns:
+                display_df['ngay_sinh'] = pd.to_datetime(display_df['ngay_sinh'], errors='coerce').dt.strftime('%d/%m/%Y').fillna('')
+
+            display_df.columns = [
+                'Mã Cán bộ', 'Họ và Tên', 'Ngày sinh', 'Số CCCD', 
+                'Chức danh', 'Khoa / Phòng', 'Trình độ', 'Số điện thoại', 'Email'
+            ]
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            st.markdown("##### 🗑️ **Xóa dữ liệu cá nhân**")
+            
+            if "status_message" in st.session_state and st.session_state["status_message"]:
+                st.info(st.session_state["status_message"])
+                if st.button("OK, Trở lại màn hình ban đầu", use_container_width=False, key="btn_ok_status"):
+                    st.session_state["status_message"] = ""
+                    st.rerun()
+            else:
+                col_del1, col_del2, col_del3 = st.columns([2.5, 1, 1])
+                options_del = ["-- Chọn nhân sự để xóa --"]
+                mapping_del = {"-- Chọn nhân sự để xóa --": None}
+                
+                for _, row in df_sorted.iterrows():
+                    mcb = str(row['ma_can_bo']) if pd.notna(row['ma_can_bo']) else "N/A"
+                    hoten = str(row['ho_ten']) if pd.notna(row['ho_ten']) else "N/A"
+                    khoa = str(row['khoa_phong']) if pd.notna(row['khoa_phong']) else "Chưa phân khoa"
+                    label = f"{mcb} - {hoten} ({khoa})"
+                    options_del.append(label)
+                    mapping_del[label] = row['id']
+                
+                if st.session_state.get("trigger_reset_selectbox", False):
+                    if "select_del_widget" in st.session_state:
+                        del st.session_state["select_del_widget"]
+                    st.session_state["trigger_reset_selectbox"] = False
+
+                selected_del_label = col_del1.selectbox("Chọn nhân sự muốn xóa:", options_del, key="select_del_widget")
+                target_id = mapping_del.get(selected_del_label, None)
+                
+                if col_del2.button("🗑️ Xóa nhân sự", use_container_width=True):
+                    if target_id is None:
+                        st.warning("⚠️ Bạn chưa chọn nhân sự nào để xóa!")
+                    else:
+                        with engine.begin() as conn:
+                            conn.execute(text("DELETE FROM can_bo WHERE id = :id"), {"id": target_id})
+                        st.cache_data.clear()
+                        st.session_state["trigger_reset_selectbox"] = True
+                        st.session_state["status_message"] = "✅ Đã xóa nhân sự được chọn thành công!"
+                        st.rerun()
+                        
+                if col_del3.button("❌ Hủy thao tác", use_container_width=True):
+                    st.session_state["trigger_reset_selectbox"] = True
+                    st.session_state["status_message"] = "ℹ️ Đã hủy thao tác."
+                    st.rerun()
+
+    # TAB 2: THÊM & SỬA NHÂN SỰ
+    with tab2:
+        st.markdown("##### ➕ **Thêm mới hoặc Chỉnh sửa thông tin Cán bộ nhân viên**")
+        mode = st.radio("Chọn thao tác:", ["Thêm mới nhân sự", "Sửa thông tin nhân sự có sẵn"], horizontal=True, key="mode_them_sua")
+        
+        danh_muc_khoa_phong = [
+            "-- Chọn Khoa / Phòng --", "Phòng Nhân sự - Tổng hợp", "Phòng Kế hoạch Tổng hợp",
+            "Phòng Tài chính Kế toán", "Khoa Khám bệnh", "Khoa Nội tổng hợp", "Khoa Ngoại tổng hợp",
+            "Khoa Cấp cứu - Hồi sức tích cực", "Khoa Nhi", "Khoa Phụ sản", "Khoa Chẩn đoán hình ảnh",
+            "Khoa Xét nghiệm", "Khoa Dược", "Khoa Kiểm soát nhiễm khuẩn"
+        ]
+        danh_muc_trinh_do = [
+            "-- Chọn Trình độ chuyên môn --", "Tiến sĩ, Bác sĩ CKI", "Thạc sĩ, Bác sĩ CKII",
+            "Bác sĩ CKII", "Bác sĩ CKI", "Bác sĩ đa khoa", "Dược sĩ đại học",
+            "Cử nhân điều dưỡng", "Cao đẳng điều dưỡng", "Trung cấp", "Khác"
+        ]
+        danh_muc_chuc_danh = [
+            "-- Chọn Chức danh --", "Ban Giám đốc", "Trưởng khoa / Trưởng phòng",
+            "Phó trưởng khoa / Phó phòng", "Bác sĩ", "Điều dưỡng trưởng", "Điều dưỡng viên",
+            "Kỹ thuật viên", "Dược sĩ", "Nhân viên hành chính"
+        ]
+
+        if mode == "Thêm mới nhân sự":
+            st.markdown("---")
+            if st.session_state.get("add_success_msg", ""):
+                st.success(st.session_state["add_success_msg"])
+                if st.button("OK, Trở về màn hình ban đầu", key="btn_ok_add_success"):
+                    st.session_state["add_success_msg"] = ""
+                    st.rerun()
+            else:
+                with st.form("form_them_nhan_su_moi", clear_on_submit=False):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        new_mcb = st.text_input("Mã Cán bộ (*)", placeholder="Ví dụ: N1971")
+                        new_hoten = st.text_input("Họ và Tên (*)", placeholder="Ví dụ: Khuất Duy Tiến")
+                        new_ngaysinh = st.date_input("Ngày sinh", value=date(1975, 1, 1), min_value=date(1930, 1, 1), max_value=date.today(), format="DD/MM/YYYY")
+                        new_cccd = st.text_input("Số CCCD", placeholder="Ví dụ: 001085123456")
+                        new_chucdanh = st.selectbox("Chức danh", danh_muc_chuc_danh)
+                    with c2:
+                        new_khoaphong = st.selectbox("Khoa / Phòng (*)", danh_muc_khoa_phong)
+                        new_trinhdo = st.selectbox("Trình độ chuyên môn", danh_muc_trinh_do)
+                        new_sdt = st.text_input("Số điện thoại", placeholder="Ví dụ: 0912222606")
+                        new_email = st.text_input("Email", placeholder="Ví dụ: example@hospital.vn")
+                    
+                    submitted_add = st.form_submit_button("💾 Lưu Nhân sự Mới", use_container_width=True)
+                    if submitted_add:
+                        if not new_mcb or not new_hoten or new_khoaphong == "-- Chọn Khoa / Phòng --":
+                            st.error("⚠️ Vui lòng điền đầy đủ các trường bắt buộc có dấu (*): Mã cán bộ, Họ tên và chọn Khoa/Phòng hợp lệ!")
+                        else:
+                            try:
+                                check_query = text("SELECT COUNT(*) FROM can_bo WHERE ma_can_bo = :mcb")
+                                with engine.connect() as conn:
+                                    count = conn.execute(check_query, {"mcb": new_mcb.strip()}).scalar()
+                                if count > 0:
+                                    st.error(f"⚠️ **Lỗi trùng lặp dữ liệu:** Mã cán bộ '{new_mcb.strip()}' đã tồn tại trong hệ thống!")
+                                else:
+                                    insert_query = text("""
+                                        INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                        VALUES (:ma_can_bo, :ho_ten, :ngay_sinh, :so_cccd, :chuc_danh, :khoa_phong, :trinh_do, :so_dien_thoai, :email)
+                                    """)
+                                    with engine.begin() as conn:
+                                        conn.execute(insert_query, {
+                                            "ma_can_bo": new_mcb.strip(), "ho_ten": new_hoten.strip(),
+                                            "ngay_sinh": new_ngaysinh, "so_cccd": new_cccd.strip() if new_cccd else None,
+                                            "chuc_danh": new_chucdanh if new_chucdanh != "-- Chọn Chức danh --" else None,
+                                            "khoa_phong": new_khoaphong,
+                                            "trinh_do": new_trinhdo if new_trinhdo != "-- Chọn Trình độ chuyên môn --" else None,
+                                            "so_dien_thoai": new_sdt.strip() if new_sdt else None,
+                                            "email": new_email.strip() if new_email else None
+                                        })
+                                    st.cache_data.clear()
+                                    st.session_state["add_success_msg"] = f"🎉 Thêm mới nhân sự [{new_mcb} - {new_hoten}] thành công!"
+                                    st.rerun()
+                            except Exception as e:
+                                st.error(f"⚠️ Đã xảy ra lỗi: {e}")
+
+        else: # Chế độ Sửa thông tin
+            st.markdown("---")
+            if df.empty:
+                st.info("Chưa có dữ liệu nhân sự để chỉnh sửa.")
+            else:
+                options_edit = ["-- Chọn nhân sự để chỉnh sửa --"]
+                mapping_edit = {"-- Chọn nhân sự để chỉnh sửa --": None}
+                for _, row in df.iterrows():
+                    mcb = str(row['ma_can_bo']) if pd.notna(row['ma_can_bo']) else "N/A"
+                    hoten = str(row['ho_ten']) if pd.notna(row['ho_ten']) else "N/A"
+                    khoa = str(row['khoa_phong']) if pd.notna(row['khoa_phong']) else "Chưa phân khoa"
+                    label = f"{mcb} - {hoten} ({khoa})"
+                    options_edit.append(label)
+                    mapping_edit[label] = row['id']
+                
+                selected_edit_label = st.selectbox("Chọn nhân sự muốn chỉnh sửa:", options_edit, key="select_edit_widget")
+                target_edit_id = mapping_edit.get(selected_edit_label, None)
+                
+                if target_edit_id is not None:
+                    current_row = df[df['id'] == target_edit_id].iloc[0]
+                    default_dob = date(1975, 1, 1)
+                    if pd.notna(current_row.get('ngay_sinh')):
+                        try:
+                            default_dob = pd.to_datetime(current_row['ngay_sinh']).date()
+                        except:
+                            pass
+                    
+                    with st.form("form_sua_nhan_su"):
+                        ec1, ec2 = st.columns(2)
+                        with ec1:
+                            edit_mcb = st.text_input("Mã Cán bộ (*)", value=str(current_row.get('ma_can_bo', '')))
+                            edit_hoten = st.text_input("Họ và Tên (*)", value=str(current_row.get('ho_ten', '')))
+                            edit_ngaysinh = st.date_input("Ngày sinh", value=default_dob, min_value=date(1930, 1, 1), max_value=date.today(), format="DD/MM/YYYY")
+                            edit_cccd = st.text_input("Số CCCD", value=str(current_row.get('so_cccd', '') or ''))
+                            
+                            curr_cd = str(current_row.get('chuc_danh', ''))
+                            idx_cd = danh_muc_chuc_danh.index(curr_cd) if curr_cd in danh_muc_chuc_danh else 0
+                            edit_chucdanh = st.selectbox("Chức danh", danh_muc_chuc_danh, index=idx_cd)
+
+                        with ec2:
+                            curr_kp = str(current_row.get('khoa_phong', ''))
+                            idx_kp = danh_muc_khoa_phong.index(curr_kp) if curr_kp in danh_muc_khoa_phong else 0
+                            edit_khoaphong = st.selectbox("Khoa / Phòng (*)", danh_muc_khoa_phong, index=idx_kp)
+
+                            curr_td = str(current_row.get('trinh_do', ''))
+                            idx_td = danh_muc_trinh_do.index(curr_td) if curr_td in danh_muc_trinh_do else 0
+                            edit_trinhdo = st.selectbox("Trình độ chuyên môn", danh_muc_trinh_do, index=idx_td)
+
+                            edit_sdt = st.text_input("Số điện thoại", value=str(current_row.get('so_dien_thoai', '') or ''))
+                            edit_email = st.text_input("Email", value=str(current_row.get('email', '') or ''))
+
+                        submitted_edit = st.form_submit_button("💾 Cập nhật thông tin", use_container_width=True)
+                        if submitted_edit:
+                            try:
+                                update_query = text("""
+                                    UPDATE can_bo SET
+                                        ma_can_bo = :ma_can_bo, ho_ten = :ho_ten, ngay_sinh = :ngay_sinh,
+                                        so_cccd = :so_cccd, chuc_danh = :chuc_danh, khoa_phong = :khoa_phong,
+                                        trinh_do = :trinh_do, so_dien_thoai = :so_dien_thoai, email = :email
+                                    WHERE id = :id
+                                """)
+                                with engine.begin() as conn:
+                                    conn.execute(update_query, {
+                                        "ma_can_bo": edit_mcb.strip(), "ho_ten": edit_hoten.strip(),
+                                        "ngay_sinh": edit_ngaysinh, "so_cccd": edit_cccd.strip() if edit_cccd else None,
+                                        "chuc_danh": edit_chucdanh if edit_chucdanh != "-- Chọn Chức danh --" else None,
+                                        "khoa_phong": edit_khoaphong,
+                                        "trinh_do": edit_trinhdo if edit_trinhdo != "-- Chọn Trình độ chuyên môn --" else None,
+                                        "so_dien_thoai": edit_sdt.strip() if edit_sdt else None,
+                                        "email": edit_email.strip() if edit_email else None,
+                                        "id": target_edit_id
+                                    })
+                                st.cache_data.clear()
+                                st.success("🎉 Cập nhật thông tin nhân sự thành công!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Lỗi khi cập nhật: {e}")
+
+    # TAB 3: NHẬP FILE EXCEL
+    with tab3:
+        st.markdown("##### 📥 **Nhập hồ sơ Cán bộ Nhân viên từ File Excel mẫu**")
+        uploaded_file = st.file_uploader("Chọn file Excel chứa danh sách nhân sự (.xlsx, .xls)", type=["xlsx", "xls"])
+        if uploaded_file is not None:
+            try:
+                df_excel = pd.read_excel(uploaded_file)
+                st.write("📋 **Xem trước dữ liệu từ file Excel:**")
+                st.dataframe(df_excel.head(), use_container_width=True)
+                
+                if st.button("🚀 Bắt đầu Import vào CSDL", use_container_width=True):
+                    with engine.begin() as conn:
+                        for _, r in df_excel.iterrows():
+                            conn.execute(text("""
+                                INSERT INTO can_bo (ma_can_bo, ho_ten, ngay_sinh, so_cccd, chuc_danh, khoa_phong, trinh_do, so_dien_thoai, email)
+                                VALUES (:ma_can_bo, :ho_ten, :ngay_sinh, :so_cccd, :chuc_danh, :khoa_phong, :trinh_do, :so_dien_thoai, :email)
+                                ON CONFLICT (ma_can_bo) DO NOTHING;
+                            """), {
+                                "ma_can_bo": str(r.get("Mã Cán bộ", "")).strip(),
+                                "ho_ten": str(r.get("Họ và Tên", "")).strip(),
+                                "ngay_sinh": pd.to_datetime(r.get("Ngày sinh"), errors='coerce'),
+                                "so_cccd": str(r.get("Số CCCD", "")).strip(),
+                                "chuc_danh": str(r.get("Chức danh", "")).strip(),
+                                "khoa_phong": str(r.get("Khoa / Phòng", "")).strip(),
+                                "trinh_do": str(r.get("Trình độ", "")).strip(),
+                                "so_dien_thoai": str(r.get("Số điện thoại", "")).strip(),
+                                "email": str(r.get("Email", "")).strip()
+                            })
+                    st.cache_data.clear()
+                    st.success("🎉 Tải dữ liệu từ Excel vào CSDL thành công!")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Lỗi đọc file Excel: {e}")
+
+    # TAB 4: XUẤT EXCEL
+    with tab4:
+        st.markdown("##### 📤 **Xuất dữ liệu Nhân sự ra File Excel**")
+        if df.empty:
+            st.info("Hiện không có dữ liệu để xuất Excel.")
+        else:
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='DanhSachCanBo')
+            st.download_button(
+                label="📥 Tải xuống File Excel (.xlsx)",
+                data=buffer.getvalue(),
+                file_name=f"Danh_sach_can_bo_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.ms-excel",
+                use_container_width=True
+            )
 
 # ---------------------------------------------------------
-# 6. SIDEBAR & ĐIỀU HƯỚNG ROUTING
+# 6. KHAI BÁO SIDEBAR & ĐIỀU HƯỚNG ROUTING THÔNG MINH
 # ---------------------------------------------------------
 def render_dashboard():
     st.sidebar.markdown(
@@ -308,6 +624,7 @@ def render_dashboard():
         "🏥 Quản lý BHOI & Sức khỏe", 
         "⏰ Quản lý Chấm công & Ngày nghỉ", 
         "📊 Báo cáo - Thống kê", 
+        "📊 Thống kê Tiến độ Đào tạo MS", 
         "⚙️ Cấu hình Hệ thống"
     ]
 
@@ -320,7 +637,7 @@ def render_dashboard():
         render_quan_ly_can_bo()
     else:
         st.title(f"{menu_choice}")
-        st.info("Chức năng đang trong quá trình đồng bộ dữ liệu...")
+        st.info("Chức năng đang trong quá trình đồng bộ dữ liệu chi tiết...")
 
 # ---------------------------------------------------------
 # 7. CHẠY APP
