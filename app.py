@@ -2,11 +2,13 @@ import os
 import io
 import base64
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, date
 from sqlalchemy import create_engine, text
+
+# Import mô-đun chấm công riêng biệt
+from cham_cong import render_quan_ly_cham_cong
 
 # ---------------------------------------------------------
 # 1. CẤU HÌNH TRANG & CSS GIAO DIỆN
@@ -80,14 +82,6 @@ if 'db_initialized' not in st.session_state:
     st.session_state['db_initialized'] = False
 if 'user_info' not in st.session_state:
     st.session_state['user_info'] = {"fullname": "Đoàn Danh Hiển", "role": "Quản trị viên Hệ thống"}
-
-# Khởi tạo dữ liệu giả lập nghỉ phép nếu chưa có trong session_state
-if 'don_nghi_phep' not in st.session_state:
-    st.session_state['don_nghi_phep'] = pd.DataFrame([
-        {"id": 1, "ma_can_bo": "N1971", "ho_ten": "Khuất Duy Tiến", "khoa_phong": "Khoa Ngoại tổng hợp", "loai_nghi": "Nghỉ phép năm", "tu_ngay": "2026-09-10", "den_ngay": "2026-09-12", "so_ngay": 3, "ly_do": "Giải quyết việc gia đình", "trang_thai": "Đã phê duyệt"},
-        {"id": 2, "ma_can_bo": "N2088", "ho_ten": "Nguyễn Văn An", "khoa_phong": "Khoa Khám bệnh", "loai_nghi": "Nghỉ bù trực", "tu_ngay": "2026-09-15", "den_ngay": "2026-09-15", "so_ngay": 1, "ly_do": "Nghỉ bù sau ca trực đêm 14/09", "trang_thai": "Chờ phê duyệt"},
-        {"id": 3, "ma_can_bo": "N3012", "ho_ten": "Trần Thị Bích", "khoa_phong": "Phòng Kế hoạch Tổng hợp", "loai_nghi": "Nghỉ ốm / BHXH", "tu_ngay": "2026-09-14", "den_ngay": "2026-09-16", "so_ngay": 3, "ly_do": "Điều trị ngoại trú theo chỉ định Bác sĩ", "trang_thai": "Chờ phê duyệt"}
-    ])
 
 # ---------------------------------------------------------
 # 2. DATABASE NEON
@@ -270,7 +264,7 @@ def render_dashboard_home():
         st.plotly_chart(fig_hd, use_container_width=True, config={'displayModeBar': False})
 
 # ---------------------------------------------------------
-# 5. QUẢN LÝ CÁN BỘ CNV (ĐẦY ĐỦ 4 TABS)
+# 5. QUẢN LÝ CÁN BỘ CNV
 # ---------------------------------------------------------
 def render_quan_ly_can_bo():
     st.markdown("---")
@@ -290,7 +284,6 @@ def render_quan_ly_can_bo():
         "📤 Xuất Data Excel"
     ])
     
-    # TAB 1: DANH SÁCH & XÓA
     with tab1:
         col_t1, col_t2, col_t3 = st.columns([3, 1.2, 1.2])
         col_t1.markdown("##### **Danh sách cán bộ nhân viên hiện có**")
@@ -394,7 +387,6 @@ def render_quan_ly_can_bo():
                     st.session_state["status_message"] = "ℹ️ Đã hủy thao tác."
                     st.rerun()
 
-    # TAB 2: THÊM & SỬA NHÂN SỰ
     with tab2:
         st.markdown("##### ➕ **Thêm mới hoặc Chỉnh sửa thông tin Cán bộ nhân viên**")
         mode = st.radio("Chọn thao tác:", ["Thêm mới nhân sự", "Sửa thông tin nhân sự có sẵn"], horizontal=True, key="mode_them_sua")
@@ -470,7 +462,7 @@ def render_quan_ly_can_bo():
                             except Exception as e:
                                 st.error(f"⚠️ Đã xảy ra lỗi: {e}")
 
-        else: # Chế độ Sửa thông tin
+        else:
             st.markdown("---")
             if df.empty:
                 st.info("Chưa có dữ liệu nhân sự để chỉnh sửa.")
@@ -548,7 +540,6 @@ def render_quan_ly_can_bo():
                             except Exception as e:
                                 st.error(f"Lỗi khi cập nhật: {e}")
 
-    # TAB 3: NHẬP FILE EXCEL
     with tab3:
         st.markdown("##### 📥 **Nhập hồ sơ Cán bộ Nhân viên từ File Excel mẫu**")
         uploaded_file = st.file_uploader("Chọn file Excel chứa danh sách nhân sự (.xlsx, .xls)", type=["xlsx", "xls"])
@@ -582,7 +573,6 @@ def render_quan_ly_can_bo():
             except Exception as e:
                 st.error(f"Lỗi đọc file Excel: {e}")
 
-    # TAB 4: XUẤT EXCEL
     with tab4:
         st.markdown("##### 📤 **Xuất dữ liệu Nhân sự ra File Excel**")
         if df.empty:
@@ -600,138 +590,7 @@ def render_quan_ly_can_bo():
             )
 
 # ---------------------------------------------------------
-# 6. QUẢN LÝ CHẤM CÔNG & NGÀY NGHỈ
-# ---------------------------------------------------------
-def render_quan_ly_cham_cong():
-    st.markdown("---")
-    st.subheader("⏰ QUẢN LÝ CHẤM CÔNG & NGÀY NGHỈ - BỆNH VIỆN BƯU ĐIỆN")
-    
-    df_cb = load_data_from_db()
-    
-    tab_cc1, tab_cc2, tab_cc3, tab_cc4 = st.tabs([
-        "📊 Bảng Tổng hợp Chấm công", 
-        "📝 Đăng ký Nghỉ phép / Nghỉ bù", 
-        "✅ Duyệt Đơn nghỉ phép", 
-        "📥 Import Bảng chấm công Excel"
-    ])
-    
-    # TAB 1: BẢNG TỔNG HỢP CHẤM CÔNG
-    with tab_cc1:
-        st.markdown("##### 📅 **Bảng tổng hợp công lao động & Ngày nghỉ trong tháng**")
-        col_m1, col_m2, col_m3 = st.columns([1.5, 1.5, 2])
-        month_sel = col_m1.selectbox("Chọn tháng:", [f"Tháng {i:02d}/2026" for i in range(1, 13)], index=8)
-        dept_filter = col_m2.selectbox("Lọc theo Khoa / Phòng:", ["-- Tất cả Khoa / Phòng --"] + list(df_cb['khoa_phong'].dropna().unique()) if not df_cb.empty else ["-- Tất cả Khoa / Phòng --"])
-        
-        # Mẫu dữ liệu tổng hợp công
-        data_cc = []
-        if not df_cb.empty:
-            for idx, r in df_cb.iterrows():
-                data_cc.append({
-                    "Mã Cán bộ": r['ma_can_bo'],
-                    "Họ và Tên": r['ho_ten'],
-                    "Khoa / Phòng": r['khoa_phong'],
-                    "Công chuẩn": 22,
-                    "Công thực tế": 21,
-                    "Công trực 24h": 3,
-                    "Phép năm": 1,
-                    "Nghỉ BHXH/Ốm": 0,
-                    "Tăng giờ (giờ)": 12.5,
-                    "Ghi chú": "Đủ công"
-                })
-            df_cc = pd.DataFrame(data_cc)
-            if dept_filter != "-- Tất cả Khoa / Phòng --":
-                df_cc = df_cc[df_cc['Khoa / Phòng'] == dept_filter]
-            st.dataframe(df_cc, use_container_width=True, hide_index=True)
-        else:
-            st.info("Chưa có danh sách nhân sự để tổng hợp chấm công.")
-
-    # TAB 2: ĐĂNG KÝ NGHỈ PHÉP
-    with tab_cc2:
-        st.markdown("##### 📝 **Tạo đơn đăng ký nghỉ phép / nghỉ bù / nghỉ BHXH**")
-        with st.form("form_dang_ky_nghi"):
-            col_dk1, col_dk2 = st.columns(2)
-            
-            options_cb = ["-- Chọn cán bộ nghỉ --"]
-            if not df_cb.empty:
-                for _, r in df_cb.iterrows():
-                    options_cb.append(f"{r['ma_can_bo']} - {r['ho_ten']} ({r['khoa_phong']})")
-                    
-            selected_cb_nghi = col_dk1.selectbox("Cán bộ đăng ký (*):", options_cb)
-            loai_nghi = col_dk1.selectbox("Loại hình nghỉ (*):", ["Nghỉ phép năm", "Nghỉ bù trực", "Nghỉ ốm / BHXH", "Nghỉ thai sản", "Nghỉ việc riêng (Kết hôn, hiếu, hỷ)", "Nghỉ không hưởng lương"])
-            
-            tu_ngay = col_dk2.date_input("Từ ngày (*):", value=date.today())
-            den_ngay = col_dk2.date_input("Đến ngày (*):", value=date.today())
-            ly_do_nghi = st.text_area("Lý do xin nghỉ (*):", placeholder="Ghi rõ lý do và người bàn giao công việc...")
-            
-            submit_don = st.form_submit_button("🚀 Gửi Đơn Đăng Ký Nghỉ", use_container_width=True)
-            if submit_don:
-                if selected_cb_nghi == "-- Chọn cán bộ nghỉ --" or not ly_do_nghi.strip():
-                    st.error("⚠️ Vui lòng chọn Cán bộ và điền đầy đủ lý do xin nghỉ!")
-                else:
-                    parts = selected_cb_nghi.split(" - ")
-                    mcb = parts[0]
-                    rest = parts[1].split(" (")
-                    hoten = rest[0]
-                    khoa = rest[1].replace(")", "")
-                    
-                    so_ngay = (den_ngay - tu_ngay).days + 1
-                    
-                    new_id = len(st.session_state['don_nghi_phep']) + 1
-                    new_don = {
-                        "id": new_id,
-                        "ma_can_bo": mcb,
-                        "ho_ten": hoten,
-                        "khoa_phong": khoa,
-                        "loai_nghi": loai_nghi,
-                        "tu_ngay": tu_ngay.strftime('%Y-%m-%d'),
-                        "den_ngay": den_ngay.strftime('%Y-%m-%d'),
-                        "so_ngay": so_ngay,
-                        "ly_do": ly_do_nghi,
-                        "trang_thai": "Chờ phê duyệt"
-                    }
-                    st.session_state['don_nghi_phep'] = pd.concat([st.session_state['don_nghi_phep'], pd.DataFrame([new_don])], ignore_index=True)
-                    st.success("🎉 Đơn xin nghỉ đã được gửi thành công! Đang chờ Lãnh đạo phê duyệt.")
-
-    # TAB 3: DUYỆT ĐƠN NGHỈ PHÉP
-    with tab_cc3:
-        st.markdown("##### ✅ **Danh sách Đơn xin nghỉ phép chờ phê duyệt**")
-        df_don = st.session_state['don_nghi_phep']
-        
-        if df_don.empty:
-            st.info("Hiện không có đơn xin nghỉ nào.")
-        else:
-            st.dataframe(df_don, use_container_width=True, hide_index=True)
-            st.markdown("---")
-            st.markdown("##### ⚙️ **Thao tác Phê duyệt**")
-            
-            df_cho = df_don[df_don['trang_thai'] == 'Chờ phê duyệt']
-            if df_cho.empty:
-                st.success("✨ Tất cả các đơn đăng ký đã được xử lý xong!")
-            else:
-                list_cho = [f"Đơn #{r['id']} - {r['ho_ten']} ({r['loai_nghi']}: {r['tu_ngay']} đến {r['den_ngay']})" for _, r in df_cho.iterrows()]
-                selected_don_approve = st.selectbox("Chọn đơn cần xử lý:", list_cho)
-                
-                target_don_id = int(selected_don_approve.split(" - ")[0].replace("Đơn #", ""))
-                
-                col_ap1, col_ap2 = st.columns(2)
-                if col_ap1.button("✅ Phê Duyệt Đơn", use_container_width=True):
-                    st.session_state['don_nghi_phep'].loc[st.session_state['don_nghi_phep']['id'] == target_don_id, 'trang_thai'] = 'Đã phê duyệt'
-                    st.toast("✅ Đã phê duyệt đơn thành công!")
-                    st.rerun()
-                if col_ap2.button("❌ Từ Chối Đơn", use_container_width=True):
-                    st.session_state['don_nghi_phep'].loc[st.session_state['don_nghi_phep']['id'] == target_don_id, 'trang_thai'] = 'Từ chối'
-                    st.toast("❌ Đã từ chối đơn!")
-                    st.rerun()
-
-    # TAB 4: IMPORT BẢNG CHẤM CÔNG EXCEL
-    with tab_cc4:
-        st.markdown("##### 📥 **Nhập file dữ liệu chấm công từ máy chấm công vân tay / khuôn mặt**")
-        file_cc = st.file_uploader("Tải file chấm công (.xlsx, .csv):", type=["xlsx", "xls", "csv"], key="file_uploader_cc")
-        if file_cc is not None:
-            st.success("File đã tải lên thành công. Hệ thống đang sẵn sàng xử lý dữ liệu chấm công tự động!")
-
-# ---------------------------------------------------------
-# 7. KHAI BÁO SIDEBAR & ĐIỀU HƯỚNG ROUTING THÔNG MINH
+# 6. KHAI BÁO SIDEBAR & ĐIỀU HƯỚNG ROUTING THÔNG MINH
 # ---------------------------------------------------------
 def render_dashboard():
     st.sidebar.markdown(
@@ -769,18 +628,22 @@ def render_dashboard():
     st.sidebar.markdown("---")
     menu_choice = st.sidebar.radio("Điều hướng chức năng:", options=menu_options, index=0)
 
+    # Đọc danh sách cán bộ dùng chung cho các mô-đun
+    df_cb = load_data_from_db()
+
     if "Trang chủ / Dashboard" in menu_choice:
         render_dashboard_home()
     elif "Hồ sơ Cán bộ CNV" in menu_choice:
         render_quan_ly_can_bo()
     elif "Quản lý Chấm công & Ngày nghỉ" in menu_choice:
-        render_quan_ly_cham_cong()
+        # Gọi hàm render mô-đun chấm công từ file cham_cong.py
+        render_quan_ly_cham_cong(df_cb)
     else:
         st.title(f"{menu_choice}")
         st.info("Chức năng đang trong quá trình đồng bộ dữ liệu chi tiết...")
 
 # ---------------------------------------------------------
-# 8. CHẠY APP
+# 7. CHẠY APP
 # ---------------------------------------------------------
 if not st.session_state['logged_in']:
     render_login()
