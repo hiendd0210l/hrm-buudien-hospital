@@ -35,7 +35,7 @@ def set_style(cell, font=None, fill=None, alignment=None, border=None):
 
 def set_optimal_column_widths(ws):
     """
-    Đặt độ rộng cột tối ưu, tránh bị giãn rộng bất thường do Title/Header bị merged.
+    Đặt độ rộng cột tối ưu, tránh bị giãn rộng bất thường.
     """
     for col in ws.columns:
         col_idx = col[0].column
@@ -46,7 +46,6 @@ def set_optimal_column_widths(ws):
         elif col_idx == 2:     # Mã NV
             ws.column_dimensions[col_letter].width = 11
         elif col_idx in [3, 4] and ws.title in ["NHÂN VIÊN", "HTCS", "LÀM THỨ 7"]:
-            # Cột Họ và tên (hoặc Chức vụ ở sheet ABC)
             if col_idx == 3:
                 ws.column_dimensions[col_letter].width = 22
             else:
@@ -54,7 +53,6 @@ def set_optimal_column_widths(ws):
         elif ws.title == "ABC" and col_idx == 4: # Chức vụ
             ws.column_dimensions[col_letter].width = 18
         else:
-            # Các cột Ngày (01, 02...) và cột Chỉ số Tổng hợp
             ws.column_dimensions[col_letter].width = 6
 
 
@@ -87,7 +85,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
                 else:
                     nv_list.append(item)
 
-    # Dữ liệu mẫu fallback nếu chưa load danh sách
     if not nv_list and not htcs_list:
         nv_list = [
             {"ma_cb": "N1096", "ho_ten": "Nguyễn Thị Thảo Nguyên", "chuc_vu": "Bác sĩ", "khoa_phong": "Khoa Khám bệnh"},
@@ -117,7 +114,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     
     num_days = calendar.monthrange(year, month)[1]
 
-    # Phân loại danh sách cột theo ngày
     workday_cols, sat_cols, sun_cols, hol_cols = [], [], [], []
     for d in range(1, num_days + 1):
         col_letter = get_column_letter(3 + d)
@@ -131,7 +127,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         elif day_type == "HOLIDAY":
             hol_cols.append(col_letter)
 
-    # HÀM BỔ TRỢ CÔNG THỨC: 1 KÝ TỰ = 0.5, 2 KÝ TỰ = 1.0
+    # Hàm tạo công thức tính công: 1 ký tự = 0.5, 2 ký tự = 1.0
     def build_code_formula(col_list, row_idx, single_code, double_code):
         if not col_list:
             return "0"
@@ -149,7 +145,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         parts = [f'IF(OR({c}{row_idx}="T",{c}{row_idx}="t"),1,0)' for c in col_list]
         return " + ".join(parts)
 
-    # Hàm dựng Bảng chấm công chính
     def build_main_sheet(ws, title_sheet, data_list):
         ws.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws.cell(1, 1), font=font_subtitle)
         ws.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} ({title_sheet})")
@@ -194,10 +189,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             ws.cell(idx, 2, nv["ma_cb"])
             ws.cell(idx, 3, nv["ho_ten"])
             
-            st_l = get_column_letter(4)
-            en_l = get_column_letter(3 + num_days)
-            
-            # Công thức Tổng hợp tuân thủ đúng nguyên tắc: 1 ký tự = 0.5, 2 ký tự = 1.0
             ws.cell(idx, start_sum, f'={build_code_formula(workday_cols, idx, "x", "xx")}')
             ws.cell(idx, start_sum+1, f'={build_code_formula(sat_cols, idx, "x", "xx")}')
             ws.cell(idx, start_sum+2, f'={build_code_formula(sun_cols, idx, "x", "xx")}')
@@ -214,11 +205,11 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             da_nghi_col = get_column_letter(start_sum+8)
             ws.cell(idx, start_sum+9, f'=MAX(0, {ton_col}{idx} - {da_nghi_col}{idx})')
             
-            ws.cell(idx, start_sum+10, f'={build_code_formula(all_month_cols, idx, "ts", "ts")}') # Thai sản
-            ws.cell(idx, start_sum+11, f'={build_code_formula(all_month_cols, idx, "c", "cc")}') # Công tác
-            ws.cell(idx, start_sum+12, f'={build_code_formula(all_month_cols, idx, "ô", "ôô")}') # Nghỉ ốm
-            ws.cell(idx, start_sum+13, f'={build_code_formula(all_month_cols, idx, "h", "hh")}') # Đi học
-            ws.cell(idx, start_sum+14, 0) # Tồn bù ban đầu
+            ws.cell(idx, start_sum+10, f'={build_code_formula(all_month_cols, idx, "ts", "ts")}')
+            ws.cell(idx, start_sum+11, f'={build_code_formula(all_month_cols, idx, "c", "cc")}')
+            ws.cell(idx, start_sum+12, f'={build_code_formula(all_month_cols, idx, "ô", "ôô")}')
+            ws.cell(idx, start_sum+13, f'={build_code_formula(all_month_cols, idx, "h", "hh")}')
+            ws.cell(idx, start_sum+14, 0)
 
             for c_idx in range(1, start_sum + len(headers_sum)):
                 cell = ws.cell(idx, c_idx)
@@ -278,7 +269,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             set_style(cell, font=font_data, fill=fill_color, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 4) else align_left
 
-    # SHEET 4: ABC (MỞ RỘNG ĐẦY ĐỦ CÁC CỘT TỔNG HỢP THEO YÊU CẦU)
+    # SHEET 4: ABC
     ws_abc = wb.create_sheet(title="ABC")
     ws_abc.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_abc.cell(1, 1), font=font_subtitle)
     ws_abc.cell(2, 1, f"Đơn vị: {phong_ban}"); set_style(ws_abc.cell(2, 1), font=font_subtitle)
@@ -310,32 +301,35 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         
         nv_row = idx - 1
         # Liên kết công thức từ Sheet "NHÂN VIÊN"
-        ws_abc.cell(idx, 5, f"='NHÂN VIÊN'!{get_column_letter(start_sum)}{nv_row}")     # Hành chính
-        ws_abc.cell(idx, 6, f"='NHÂN VIÊN'!{get_column_letter(start_sum+1)}{nv_row}")   # Làm T7
-        ws_abc.cell(idx, 7, f"='NHÂN VIÊN'!{get_column_letter(start_sum+2)}{nv_row}")   # Làm CN
-        ws_abc.cell(idx, 8, f"='NHÂN VIÊN'!{get_column_letter(start_sum+3)}{nv_row}")   # Làm Lễ
+        ws_abc.cell(idx, 5, f"='NHÂN VIÊN'!{get_column_letter(start_sum)}{nv_row}")
+        ws_abc.cell(idx, 6, f"='NHÂN VIÊN'!{get_column_letter(start_sum+1)}{nv_row}")
+        ws_abc.cell(idx, 7, f"='NHÂN VIÊN'!{get_column_letter(start_sum+2)}{nv_row}")
+        ws_abc.cell(idx, 8, f"='NHÂN VIÊN'!{get_column_letter(start_sum+3)}{nv_row}")
         
-        ws_abc.cell(idx, 9, f"='NHÂN VIÊN'!{get_column_letter(start_sum+7)}{nv_row}")   # Trực thường
-        ws_abc.cell(idx, 10, f"='NHÂN VIÊN'!{get_column_letter(start_sum+4)}{nv_row}")  # Trực T7
-        ws_abc.cell(idx, 11, f"='NHÂN VIÊN'!{get_column_letter(start_sum+5)}{nv_row}")  # Trực CN
-        ws_abc.cell(idx, 12, f"='NHÂN VIÊN'!{get_column_letter(start_sum+6)}{nv_row}")  # Trực Lễ
+        ws_abc.cell(idx, 9, f"='NHÂN VIÊN'!{get_column_letter(start_sum+7)}{nv_row}")
+        ws_abc.cell(idx, 10, f"='NHÂN VIÊN'!{get_column_letter(start_sum+4)}{nv_row}")
+        ws_abc.cell(idx, 11, f"='NHÂN VIÊN'!{get_column_letter(start_sum+5)}{nv_row}")
+        ws_abc.cell(idx, 12, f"='NHÂN VIÊN'!{get_column_letter(start_sum+6)}{nv_row}")
         
-        ws_abc.cell(idx, 13, f"='NHÂN VIÊN'!{get_column_letter(start_sum+8)}{nv_row}")  # Đã nghỉ bù
-        ws_abc.cell(idx, 14, f"={build_code_formula([f\"'NHÂN VIÊN'!{c}\" for c in all_month_cols], nv_row, 'p', 'pp')}") # Nghỉ phép
-        ws_abc.cell(idx, 15, f"='NHÂN VIÊN'!{get_column_letter(start_sum+10)}{nv_row}") # Thai sản
-        ws_abc.cell(idx, 16, f"='NHÂN VIÊN'!{get_column_letter(start_sum+12)}{nv_row}") # Nghỉ ốm
-        ws_abc.cell(idx, 17, f"='NHÂN VIÊN'!{get_column_letter(start_sum+11)}{nv_row}") # Công tác
-        ws_abc.cell(idx, 18, f"='NHÂN VIÊN'!{get_column_letter(start_sum+13)}{nv_row}") # Đi học
+        ws_abc.cell(idx, 13, f"='NHÂN VIÊN'!{get_column_letter(start_sum+8)}{nv_row}")
+        
+        # Đã sửa lỗi escape chuỗi ở công thức tính Nghỉ phép:
+        p_list = [f"'NHÂN VIÊN'!{c}" for c in all_month_cols]
+        ws_abc.cell(idx, 14, f"={build_code_formula(p_list, nv_row, 'p', 'pp')}")
+        
+        ws_abc.cell(idx, 15, f"='NHÂN VIÊN'!{get_column_letter(start_sum+10)}{nv_row}")
+        ws_abc.cell(idx, 16, f"='NHÂN VIÊN'!{get_column_letter(start_sum+12)}{nv_row}")
+        ws_abc.cell(idx, 17, f"='NHÂN VIÊN'!{get_column_letter(start_sum+11)}{nv_row}")
+        ws_abc.cell(idx, 18, f"='NHÂN VIÊN'!{get_column_letter(start_sum+13)}{nv_row}")
         
         ws_abc.cell(idx, 19, "A")
-        ws_abc.cell(idx, 20, f"='NHÂN VIÊN'!{get_column_letter(start_sum+9)}{nv_row}")  # Tồn bù còn lại
+        ws_abc.cell(idx, 20, f"='NHÂN VIÊN'!{get_column_letter(start_sum+9)}{nv_row}")
         
         for c_idx in range(1, len(headers_abc) + 1):
             cell = ws_abc.cell(idx, c_idx)
             set_style(cell, font=font_data, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 5) else align_left
 
-    # Tối ưu hóa kích thước độ rộng các cột cho tất cả các sheet
     for ws in wb.worksheets:
         ws.views.sheetView[0].showGridLines = True
         set_optimal_column_widths(ws)
@@ -347,7 +341,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
 
 # =====================================================================
 # 3. HÀM SẮP XẾP DANH SÁCH "ĐƠN VỊ XUẤT DỮ LIỆU" THEO ĐÚNG THỨ TỰ
-# Thứ tự: Tất cả -> Phòng (ABC) -> Khoa (ABC) -> Trung tâm (ABC)
 # =====================================================================
 def get_ordered_phong_ban_list(df_cb):
     list_phong, list_khoa, list_trung_tam = [], [], []
@@ -415,7 +408,6 @@ def render_quan_ly_cham_cong(df_cb=None):
     m2.metric("Số ngày trong tháng", f"{num_days} ngày")
     m3.metric("Tháng / Năm áp dụng", f"T{month:02d}/{year}")
 
-    # Tự động cập nhật dữ liệu file theo đúng tùy chọn Đơn vị xuất dữ liệu
     excel_data = generate_excel_mau_cham_cong(month, year, don_vi_selected, df_cb)
 
     # 3. Khu vực Xuất File Excel
@@ -500,7 +492,6 @@ def render_quan_ly_cham_cong(df_cb=None):
         }
     )
 
-# Chạy thử trực tiếp nếu gọi file độc lập
 if __name__ == "__main__":
     st.set_page_config(page_title="Chấm công Bệnh viện", layout="wide")
     render_quan_ly_cham_cong()
