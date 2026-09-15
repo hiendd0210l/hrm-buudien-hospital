@@ -7,37 +7,28 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-def get_day_colors(day: int, month: int, year: int):
+def get_day_fill(day: int, month: int, year: int):
     """
-    Xác định màu tô cho ngày:
-    - Ngày Lễ, Tết: Màu đỏ nhạt (FFC7CE)
-    - Thứ 7 & Chủ Nhật: Màu cam nhạt (FCE4D6)
-    - Ngày thường: None (dùng màu tiêu đề mặc định)
+    Xác định PatternFill cho từng ngày:
+    - Lễ/Tết: Đỏ nhạt (FFC7CE)
+    - Thứ 7 / Chủ Nhật: Cam nhạt (FCE4D6)
+    - Ngày thường: None
     """
     dt = date(year, month, day)
     weekday = dt.weekday()  # 5: Thứ 7, 6: Chủ nhật
     
-    # Các ngày lễ cố định theo Dương lịch (Tết DL, 30/4, 1/5, Quốc khánh 2/9 & 3/9)
+    # Lễ Tết cố định (01/01, 30/04, 01/05, 02/09, 03/09)
     fixed_holidays = [(1, 1), (30, 4), (1, 5), (2, 9), (3, 9)]
     
     if (day, month) in fixed_holidays:
-        return PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid") # Đỏ nhạt
+        return PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
     elif weekday in (5, 6):
-        return PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid") # Cam nhạt
+        return PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
     return None
 
-
 def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa Ngoại Tổng hợp") -> bytes:
-    """
-    Sinh file Excel mẫu Bảng chấm công chuẩn theo cấu trúc file mẫu:
-    - Tự động tô màu CAM NHẠT cột Thứ 7/Chủ Nhật, màu ĐỎ NHẠT cột ngày Lễ/Tết.
-    - Bỏ đuôi /09 ở cột ngày (chỉ hiển thị 01, 02, ..., 31).
-    - Trắng dữ liệu chấm công / người mẫu để các đơn vị tự điền.
-    - Đầy đủ các cột tổng hợp & Chữ ký Lãnh đạo đơn vị / Người lập biểu ở cuối sheet.
-    """
     wb = openpyxl.Workbook()
     
-    # Standard Fonts & Styles
     font_title = Font(name="Times New Roman", size=14, bold=True, color="002060")
     font_subtitle = Font(name="Times New Roman", size=11, bold=True)
     font_header = Font(name="Times New Roman", size=10, bold=True)
@@ -45,7 +36,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     font_data = Font(name="Times New Roman", size=10)
     font_bold = Font(name="Times New Roman", size=10, bold=True)
     
-    fill_header = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    fill_header_default = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
     
     thin_border = Border(
         left=Side(style='thin', color='D9D9D9'),
@@ -62,76 +53,78 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     ws_nv = wb.active
     ws_nv.title = "NHÂN VIÊN"
     
-    # Hàng 1 & 2: Tiêu đề Bệnh viện, Tên Bảng & Đơn vị
     ws_nv.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN").font = font_subtitle
-    ws_nv.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 15)
-    cell_t1 = ws_nv.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} CỦA CBNV")
-    cell_t1.font = font_title
-    cell_t1.alignment = Alignment(horizontal="center", vertical="center")
+    ws_nv.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 13)
+    c_title = ws_nv.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} CỦA CBNV")
+    c_title.font = font_title
+    c_title.alignment = Alignment(horizontal="center", vertical="center")
     
     ws_nv.cell(2, 1, f"Đơn vị: {phong_ban}").font = font_subtitle
     
-    # Header Bảng
-    ws_nv.merge_cells("A3:A4"); ws_nv.cell(3, 1, "STT").font = font_header
-    ws_nv.merge_cells("B3:B4"); ws_nv.cell(3, 2, "Mã NV").font = font_header
-    ws_nv.merge_cells("C3:C4"); ws_nv.cell(3, 3, "Họ và tên").font = font_header
+    ws_nv.merge_cells("A3:A4"); ws_nv.cell(3, 1, "STT")
+    ws_nv.merge_cells("B3:B4"); ws_nv.cell(3, 2, "Mã NV")
+    ws_nv.merge_cells("C3:C4"); ws_nv.cell(3, 3, "Họ và tên")
     
     ws_nv.merge_cells(start_row=3, start_column=4, end_row=3, end_column=3 + num_days)
-    cell_day_head = ws_nv.cell(3, 4, f"Ngày làm việc trong tháng {month:02d}.{year}")
-    cell_day_head.font = font_header
-    cell_day_head.alignment = Alignment(horizontal="center", vertical="center")
+    ws_nv.cell(3, 4, f"Ngày làm việc trong tháng {month:02d}.{year}")
     
-    # Hàng ngày (01, 02,... num_days) & Tô màu ngày nghỉ/lễ
+    # Ghi nhận Fill riêng cho từng cột ngày
     day_fills = {}
     for d in range(1, num_days + 1):
         col_idx = 3 + d
+        # Hiển thị số ngày 01, 02... dạng text thuần túy
         cell_d = ws_nv.cell(4, col_idx, f"{d:02d}")
-        cell_d.font = font_header
-        cell_d.alignment = Alignment(horizontal="center")
         
-        fill_color = get_day_colors(d, month, year)
+        fill_color = get_day_fill(d, month, year)
         if fill_color:
-            cell_d.fill = fill_color
             day_fills[col_idx] = fill_color
         else:
-            cell_d.fill = fill_header
+            day_fills[col_idx] = fill_header_default
 
     start_sum_col = 4 + num_days
-    
-    # Cột Tổng hợp
-    ws_nv.merge_cells(start_row=3, start_column=start_sum_col, end_row=4, end_column=start_sum_col); ws_nv.cell(3, start_sum_col, "Hành chính").font = font_header
-    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+1, end_row=4, end_column=start_sum_col+1); ws_nv.cell(3, start_sum_col+1, "Trực ngoài giờ").font = font_header
-    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+2, end_row=3, end_column=start_sum_col+3); ws_nv.cell(3, start_sum_col+2, "Nghỉ bù").font = font_header
+    ws_nv.merge_cells(start_row=3, start_column=start_sum_col, end_row=4, end_column=start_sum_col); ws_nv.cell(3, start_sum_col, "Hành chính")
+    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+1, end_row=4, end_column=start_sum_col+1); ws_nv.cell(3, start_sum_col+1, "Trực ngoài giờ")
+    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+2, end_row=3, end_column=start_sum_col+3); ws_nv.cell(3, start_sum_col+2, "Nghỉ bù")
     ws_nv.cell(4, start_sum_col+2, "Đã nghỉ").font = font_sub_header
     ws_nv.cell(4, start_sum_col+3, "Còn lại").font = font_sub_header
-    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+4, end_row=4, end_column=start_sum_col+4); ws_nv.cell(3, start_sum_col+4, "Thai sản").font = font_header
-    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+5, end_row=4, end_column=start_sum_col+5); ws_nv.cell(3, start_sum_col+5, "Công tác, họp").font = font_header
-    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+6, end_row=4, end_column=start_sum_col+6); ws_nv.cell(3, start_sum_col+6, "Nghỉ ốm").font = font_header
-    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+7, end_row=4, end_column=start_sum_col+7); ws_nv.cell(3, start_sum_col+7, "Trực lễ").font = font_header
-    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+8, end_row=4, end_column=start_sum_col+8); ws_nv.cell(3, start_sum_col+8, "Đi học").font = font_header
-    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+9, end_row=4, end_column=start_sum_col+9); ws_nv.cell(3, start_sum_col+9, "Tồn bù").font = font_header
+    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+4, end_row=4, end_column=start_sum_col+4); ws_nv.cell(3, start_sum_col+4, "Thai sản")
+    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+5, end_row=4, end_column=start_sum_col+5); ws_nv.cell(3, start_sum_col+5, "Công tác, họp")
+    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+6, end_row=4, end_column=start_sum_col+6); ws_nv.cell(3, start_sum_col+6, "Nghỉ ốm")
+    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+7, end_row=4, end_column=start_sum_col+7); ws_nv.cell(3, start_sum_col+7, "Trực lễ")
+    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+8, end_row=4, end_column=start_sum_col+8); ws_nv.cell(3, start_sum_col+8, "Đi học")
+    ws_nv.merge_cells(start_row=3, start_column=start_sum_col+9, end_row=4, end_column=start_sum_col+9); ws_nv.cell(3, start_sum_col+9, "Tồn bù")
 
-    # Alignment & Background chung cho Header
-    for c in range(1, start_sum_col + 10):
-        for r in [3, 4]:
+    # Áp dụng Font, Alignment và Fill chính xác cho từng ô Header
+    for r in range(3, 5):
+        for c in range(1, start_sum_col + 10):
             cell = ws_nv.cell(r, c)
-            if c not in day_fills or r == 3:
-                cell.fill = fill_header
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            if cell.font.name != "Times New Roman" or not cell.font.bold:
+                cell.font = font_header
+            
+            # Nếu cột nằm trong dải ngày tháng
+            if 4 <= c <= 3 + num_days:
+                if r == 4:
+                    cell.fill = day_fills[c]
+                else:
+                    cell.fill = fill_header_default
+            else:
+                cell.fill = fill_header_default
 
-    # Dòng trống dữ liệu + Tô màu cột ngày nghỉ
+    # Dòng trống dữ liệu & tô màu nền các cột T7, CN, Lễ
     for r_idx in range(5, 20):
         ws_nv.cell(r_idx, 1, r_idx - 4).alignment = Alignment(horizontal="center")
         for c_idx in range(1, start_sum_col + 10):
             cell = ws_nv.cell(r_idx, c_idx)
             cell.border = thin_border
             cell.font = font_data
-            if c_idx in day_fills:
+            
+            # Tô màu nền cho các ngày T7, CN hoặc Lễ/Tết ở thân bảng
+            if c_idx in day_fills and day_fills[c_idx] != fill_header_default:
                 cell.fill = day_fills[c_idx]
             if c_idx >= 4:
                 cell.alignment = Alignment(horizontal="center")
 
-    # Chữ ký Xác nhận
     sign_row = 22
     ws_nv.cell(sign_row, 3, "Lãnh đạo đơn vị").font = font_bold
     ws_nv.cell(sign_row, start_sum_col + 4, "Người lập biểu").font = font_bold
@@ -141,64 +134,60 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     # ---------------------------------------------------------------------
     ws_htcs = wb.create_sheet(title="HTCS")
     ws_htcs.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN").font = font_subtitle
-    ws_htcs.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 15)
+    ws_htcs.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 11)
     c_htcs_t = ws_htcs.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} CỦA NHÂN VIÊN LAO ĐỘNG THUÊ LẠI")
     c_htcs_t.font = font_title
     c_htcs_t.alignment = Alignment(horizontal="center", vertical="center")
     
     ws_htcs.cell(2, 1, f"Đơn vị: {phong_ban}").font = font_subtitle
 
-    # Header HTCS
-    ws_htcs.merge_cells("A3:A4"); ws_htcs.cell(3, 1, "STT").font = font_header
-    ws_htcs.merge_cells("B3:B4"); ws_htcs.cell(3, 2, "Mã NV").font = font_header
-    ws_htcs.merge_cells("C3:C4"); ws_htcs.cell(3, 3, "Họ và tên").font = font_header
+    ws_htcs.merge_cells("A3:A4"); ws_htcs.cell(3, 1, "STT")
+    ws_htcs.merge_cells("B3:B4"); ws_htcs.cell(3, 2, "Mã NV")
+    ws_htcs.merge_cells("C3:C4"); ws_htcs.cell(3, 3, "Họ và tên")
     
     ws_htcs.merge_cells(start_row=3, start_column=4, end_row=3, end_column=3 + num_days)
-    c_day_htcs = ws_htcs.cell(3, 4, f"Ngày làm việc trong tháng {month:02d}.{year}")
-    c_day_htcs.font = font_header
-    c_day_htcs.alignment = Alignment(horizontal="center", vertical="center")
+    ws_htcs.cell(3, 4, f"Ngày làm việc trong tháng {month:02d}.{year}")
 
     for d in range(1, num_days + 1):
         col_idx = 3 + d
-        c_d = ws_htcs.cell(4, col_idx, f"{d:02d}")
-        c_d.font = font_header
-        c_d.alignment = Alignment(horizontal="center")
-        if col_idx in day_fills:
-            c_d.fill = day_fills[col_idx]
-        else:
-            c_d.fill = fill_header
+        ws_htcs.cell(4, col_idx, f"{d:02d}")
 
-    # Cột tổng hợp HTCS
-    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col, end_row=4, end_column=start_sum_col); ws_htcs.cell(3, start_sum_col, "Hành chính").font = font_header
-    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+1, end_row=4, end_column=start_sum_col+1); ws_htcs.cell(3, start_sum_col+1, "Trực ngoài giờ").font = font_header
-    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+2, end_row=4, end_column=start_sum_col+2); ws_htcs.cell(3, start_sum_col+2, "Trực cuối tuần").font = font_header
-    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+3, end_row=4, end_column=start_sum_col+3); ws_htcs.cell(3, start_sum_col+3, "Trực ngày lễ").font = font_header
-    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+4, end_row=3, end_column=start_sum_col+5); ws_htcs.cell(3, start_sum_col+4, "Nghỉ bù").font = font_header
+    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col, end_row=4, end_column=start_sum_col); ws_htcs.cell(3, start_sum_col, "Hành chính")
+    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+1, end_row=4, end_column=start_sum_col+1); ws_htcs.cell(3, start_sum_col+1, "Trực ngoài giờ")
+    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+2, end_row=4, end_column=start_sum_col+2); ws_htcs.cell(3, start_sum_col+2, "Trực cuối tuần")
+    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+3, end_row=4, end_column=start_sum_col+3); ws_htcs.cell(3, start_sum_col+3, "Trực ngày lễ")
+    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+4, end_row=3, end_column=start_sum_col+5); ws_htcs.cell(3, start_sum_col+4, "Nghỉ bù")
     ws_htcs.cell(4, start_sum_col+4, "Đã nghỉ").font = font_sub_header
     ws_htcs.cell(4, start_sum_col+5, "Còn lại").font = font_sub_header
-    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+6, end_row=4, end_column=start_sum_col+6); ws_htcs.cell(3, start_sum_col+6, "Làm cuối tuần").font = font_header
-    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+7, end_row=4, end_column=start_sum_col+7); ws_htcs.cell(3, start_sum_col+7, "Nghỉ ốm").font = font_header
+    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+6, end_row=4, end_column=start_sum_col+6); ws_htcs.cell(3, start_sum_col+6, "Làm cuối tuần")
+    ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+7, end_row=4, end_column=start_sum_col+7); ws_htcs.cell(3, start_sum_col+7, "Nghỉ ốm")
 
-    for c in range(1, start_sum_col + 8):
-        for r in [3, 4]:
+    for r in range(3, 5):
+        for c in range(1, start_sum_col + 8):
             cell = ws_htcs.cell(r, c)
-            if c not in day_fills or r == 3:
-                cell.fill = fill_header
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            if cell.font.name != "Times New Roman" or not cell.font.bold:
+                cell.font = font_header
+            
+            if 4 <= c <= 3 + num_days:
+                if r == 4:
+                    cell.fill = day_fills[c]
+                else:
+                    cell.fill = fill_header_default
+            else:
+                cell.fill = fill_header_default
 
-    # 15 Dòng trắng dữ liệu HTCS + Tô màu cột ngày nghỉ
     for r_idx in range(5, 20):
         ws_htcs.cell(r_idx, 1, r_idx - 4).alignment = Alignment(horizontal="center")
         for c_idx in range(1, start_sum_col + 8):
             cell = ws_htcs.cell(r_idx, c_idx)
             cell.border = thin_border
             cell.font = font_data
-            if c_idx in day_fills:
+            if c_idx in day_fills and day_fills[c_idx] != fill_header_default:
                 cell.fill = day_fills[c_idx]
             if c_idx >= 4:
                 cell.alignment = Alignment(horizontal="center")
 
-    # Chữ ký HTCS
     ws_htcs.cell(sign_row, 3, "Lãnh đạo đơn vị").font = font_bold
     ws_htcs.cell(sign_row, start_sum_col + 3, "Người lập biểu").font = font_bold
 
@@ -218,7 +207,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     for col_i, h in enumerate(headers_t7, 1):
         c = ws_t7.cell(3, col_i, h)
         c.font = font_header
-        c.fill = fill_header
+        c.fill = fill_header_default
         c.alignment = Alignment(horizontal="center", vertical="center")
 
     for r_idx in range(4, 18):
@@ -234,7 +223,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     ws_t7.cell(20, 7, "Người lập biểu").font = font_bold
 
     # ---------------------------------------------------------------------
-    # TAB 4: ABC (BÌNH BẦU XẾP LOẠI)
+    # TAB 4: ABC
     # ---------------------------------------------------------------------
     ws_abc = wb.create_sheet(title="ABC")
     ws_abc.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN").font = font_subtitle
@@ -244,11 +233,11 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     c_abc.font = font_title
     c_abc.alignment = Alignment(horizontal="center")
 
-    headers_abc = ["STT", "Mã NV", "HỌ VÀ TÊN", "CHỨC VỤ", "ĐI LÀM", "TRỰC", "NGHỈ BÙ", "NGHỈ KHÁC", "XẾP LOẠI", "TỒN BÙ"]
+    headers_abc = ["STT", "Mã NV", "HỘ VÀ TÊN", "CHỨC VỤ", "ĐI LÀM", "TRỰC", "NGHỈ BÙ", "NGHỈ KHÁC", "XẾP LOẠI", "TỒN BÙ"]
     for col_i, h in enumerate(headers_abc, 1):
         c = ws_abc.cell(5, col_i, h)
         c.font = font_header
-        c.fill = fill_header
+        c.fill = fill_header_default
         c.alignment = Alignment(horizontal="center")
 
     for r_idx in range(6, 20):
@@ -287,8 +276,8 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     
     ws_kh.cell(3, 1, "Ký hiệu").font = font_header
     ws_kh.cell(3, 2, "Diễn giải ý nghĩa").font = font_header
-    ws_kh.cell(3, 1).fill = fill_header
-    ws_kh.cell(3, 2).fill = fill_header
+    ws_kh.cell(3, 1).fill = fill_header_default
+    ws_kh.cell(3, 2).fill = fill_header_default
     
     for r_idx, (kh, val) in enumerate(ky_hieu_data, start=4):
         c_kh = ws_kh.cell(r_idx, 1, kh)
@@ -297,12 +286,12 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
         c_kh.alignment = Alignment(horizontal="center")
         c_val.font = font_data
 
-    # Tự động căn chỉnh độ rộng các cột
+    # Tự động căn chỉnh độ rộng cột
     for ws_curr in wb.worksheets:
         for col in ws_curr.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
             col_letter = get_column_letter(col[0].column)
-            ws_curr.column_dimensions[col_letter].width = max(max_len + 3, 6)
+            ws_curr.column_dimensions[col_letter].width = max(max_len + 3, 5)
 
     output = io.BytesIO()
     wb.save(output)
@@ -310,7 +299,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
 
 
 def init_cham_cong_session():
-    """Khởi tạo session state riêng cho mô-đun chấm công"""
     if 'don_nghi_phep' not in st.session_state:
         st.session_state['don_nghi_phep'] = pd.DataFrame([
             {"id": 1, "ma_can_bo": "N1971", "ho_ten": "Khuất Duy Tiến", "khoa_phong": "Khoa Ngoại tổng hợp", "loai_nghi": "Nghỉ phép năm", "tu_ngay": "2026-09-10", "den_ngay": "2026-09-12", "so_ngay": 3, "ly_do": "Giải quyết việc gia đình", "trang_thai": "Đã phê duyệt"},
@@ -319,7 +307,6 @@ def init_cham_cong_session():
 
 
 def render_quan_ly_cham_cong(df_cb):
-    """Giao diện chính mô-đun Quản lý Chấm công & Ngày nghỉ"""
     init_cham_cong_session()
     
     st.markdown("---")
@@ -332,7 +319,6 @@ def render_quan_ly_cham_cong(df_cb):
         "📥 Tải File Mẫu & Import Excel"
     ])
     
-    # TAB 1: BẢNG TỔNG HỢP CHẤM CÔNG
     with tab_cc1:
         st.markdown("##### 📅 **Bảng tổng hợp công lao động & Ngày nghỉ trong tháng**")
         col_m1, col_m2, _ = st.columns([1.5, 1.5, 2])
@@ -364,7 +350,6 @@ def render_quan_ly_cham_cong(df_cb):
         else:
             st.info("Chưa có danh sách nhân sự để tổng hợp chấm công.")
 
-    # TAB 2: ĐĂNG KÝ NGHỈ PHÉP
     with tab_cc2:
         st.markdown("##### 📝 **Tạo đơn đăng ký nghỉ phép / nghỉ bù / nghỉ BHXH**")
         with st.form("form_dang_ky_nghi"):
@@ -389,15 +374,13 @@ def render_quan_ly_cham_cong(df_cb):
                 else:
                     st.success("🎉 Gửi đơn thành công!")
 
-    # TAB 3: DUYỆT ĐƠN NGHỈ PHÉP
     with tab_cc3:
         st.markdown("##### ✅ **Danh sách Đơn xin nghỉ phép chờ phê duyệt**")
         st.dataframe(st.session_state['don_nghi_phep'], use_container_width=True, hide_index=True)
 
-    # TAB 4: TẠO FILE EXCEL MẪU & IMPORT BẢNG CHẤM CÔNG
     with tab_cc4:
         st.markdown("##### 📄 **1. Tự động tạo File Excel mẫu Bảng Chấm Công theo tháng**")
-        st.caption("Xuất file Excel mẫu chuẩn (Tự động phân biệt tô màu Cam nhạt ngày T7/CN và Đỏ nhạt ngày Lễ/Tết).")
+        st.caption("Xuất file Excel mẫu chuẩn (Tự động tô màu Cam nhạt ngày T7/CN và Đỏ nhạt ngày Lễ/Tết).")
         
         c_m1, c_m2, c_m3 = st.columns([1, 1, 2])
         sel_month = c_m1.selectbox("Chọn tháng xuất mẫu:", list(range(1, 13)), index=datetime.now().month - 1)
@@ -409,7 +392,6 @@ def render_quan_ly_cham_cong(df_cb):
             
         sel_dept = st.selectbox("Tên Khoa / Phòng tạo bảng chấm công:", dept_list)
         
-        # Sinh dữ liệu Excel mẫu dựa trên tháng/năm/đơn vị đã chọn
         excel_bytes = generate_excel_mau_cham_cong(sel_month, sel_year, sel_dept)
         
         st.download_button(
