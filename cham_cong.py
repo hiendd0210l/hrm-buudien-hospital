@@ -8,8 +8,8 @@ import io
 def generate_attendance_excel(df_employees, month=9, year=2026):
     """
     Hàm xuất file Excel chấm công chuẩn:
-    1. Xóa bỏ hoàn toàn cột "Tồn bù"
-    2. Đồng bộ công thức ngày T7, CN, Lễ sang sheet "LÀM THỨ 7" và tính tổng công riêng
+    1. Bỏ hoàn toàn cột "Tồn bù"
+    2. Đồng bộ công thức ngày T7, CN, Lễ sang sheet "LÀM THỨ 7"
     3. Căn chỉnh độ rộng cột "Họ và tên" sheet LÀM THỨ 7 lên 25pt
     """
     wb = openpyxl.Workbook()
@@ -96,7 +96,7 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
         row = start_row + idx
         ws_main[f"A{row}"] = idx + 1
         
-        ma_nv = row_data.get("Mã NV", row_data.get("ma_nv", row_data.get("Mã cán bộ", f"N{1000+idx}")))
+        ma_nv = row_data.get("Mã NV", row_data.get("ma_cb", row_data.get("Mã cán bộ", f"N{1000+idx}")))
         ho_ten = row_data.get("Họ và tên", row_data.get("ho_ten", row_data.get("Họ tên", "")))
         
         ws_main[f"B{row}"] = ma_nv
@@ -105,7 +105,7 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
         for day in range(1, 31):
             col_let = get_column_letter(3 + day)
             cell = ws_main[f"{col_let}{row}"]
-            val = row_data.get(f"D{day}", "x" if day not in sundays else "")
+            val = row_data.get(f"{day:02d}", row_data.get(f"D{day}", "x" if day not in sundays else ""))
             cell.value = val
             cell.alignment = CENTER_ALIGN
 
@@ -175,7 +175,7 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
         row = start_row + idx
         ws_t7[f"A{row}"] = idx + 1
         
-        ma_nv = row_data.get("Mã NV", row_data.get("ma_nv", row_data.get("Mã cán bộ", f"N{1000+idx}")))
+        ma_nv = row_data.get("Mã NV", row_data.get("ma_cb", row_data.get("Mã cán bộ", f"N{1000+idx}")))
         ho_ten = row_data.get("Họ và tên", row_data.get("ho_ten", row_data.get("Họ tên", "")))
 
         ws_t7[f"B{row}"] = ma_nv
@@ -204,7 +204,7 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
 
     ws_t7.column_dimensions['A'].width = 5
     ws_t7.column_dimensions['B'].width = 10
-    ws_t7.column_dimensions['C'].width = 25  # Căn rộng cột Họ và tên 25pt
+    ws_t7.column_dimensions['C'].width = 25  # Độ rộng 25pt cho Họ và tên
     
     for day in range(1, 31):
         ws_t7.column_dimensions[get_column_letter(3 + day)].width = 3.5
@@ -218,17 +218,12 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
 
 def render_quan_ly_cham_cong(df_cb=None):
     """
-    Khôi phục đầy đủ giao diện Quản lý chấm công ban đầu
+    Giao diện Quản lý chấm công chuẩn: Đã lọc các cột dữ liệu thô, 
+    trả lại bảng chấm công cực kỳ gọn gàng.
     """
     st.title("📋 Quản lý Chấm công & Ngày nghỉ")
 
-    if df_cb is None or (isinstance(df_cb, pd.DataFrame) and df_cb.empty):
-        df_cb = pd.DataFrame([
-            {"Mã NV": "N1108", "Họ và tên": "Mai Tuấn Linh", "Chức vụ": "Cán bộ"},
-            {"Mã NV": "N1109", "Họ và tên": "Hoàng Tuấn Anh", "Chức vụ": "Cán bộ"},
-        ])
-
-    # Bộ lọc Thời gian & Phòng ban
+    # 1. Bộ lọc Thời gian & Phòng ban
     col1, col2, col3 = st.columns([2, 2, 3])
     with col1:
         thang = st.selectbox("Tháng", list(range(1, 13)), index=8)
@@ -237,43 +232,81 @@ def render_quan_ly_cham_cong(df_cb=None):
     with col3:
         don_vi = st.selectbox("Đơn vị / Phòng ban", ["Phòng Công nghệ thông tin", "Tất cả các khoa phòng"])
 
-    # Các Tabs chức năng chính
-    tab1, tab2, tab3 = st.tabs(["📅 Bảng chấm công chi tiết", "📊 Tổng hợp công", "⚙️ Thiết lập ký hiệu"])
+    # 2. Xử lý chuẩn hóa danh sách nhân viên gọn gàng (Lọc bỏ các cột thô id, cccd, sdt, email...)
+    if df_cb is not None and isinstance(df_cb, pd.DataFrame) and not df_cb.empty:
+        df_clean = pd.DataFrame()
+        df_clean["STT"] = range(1, len(df_cb) + 1)
+        df_clean["Mã NV"] = df_cb["ma_cb"] if "ma_cb" in df_cb.columns else df_cb.get("Mã cán bộ", df_cb.get("Mã NV", ""))
+        df_clean["Họ và tên"] = df_cb["ho_ten"] if "ho_ten" in df_cb.columns else df_cb.get("Họ tên", df_cb.get("Họ và tên", ""))
+        df_clean["Chức danh"] = df_cb["chuc_danh"] if "chuc_danh" in df_cb.columns else df_cb.get("Chức danh", "Cán bộ")
+        df_clean["Khoa / Phòng"] = df_cb["khoa_phong"] if "khoa_phong" in df_cb.columns else df_cb.get("Khoa/Phòng", "Phòng CNTT")
+    else:
+        df_clean = pd.DataFrame([
+            {"STT": 1, "Mã NV": "N1108", "Họ và tên": "Mai Tuấn Linh", "Chức danh": "Cán bộ", "Khoa / Phòng": "Phòng CNTT"},
+            {"STT": 2, "Mã NV": "N1109", "Họ và tên": "Hoàng Tuấn Anh", "Chức danh": "Cán bộ", "Khoa / Phòng": "Phòng CNTT"},
+            {"STT": 3, "Mã NV": "N1090", "Họ và tên": "Phạm Văn Hiếu", "Chức danh": "Cán bộ", "Khoa / Phòng": "Phòng CNTT"},
+        ])
+
+    # 3. Thẻ thống kê tổng quan
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("👥 Tổng nhân viên", f"{len(df_clean)} người")
+    m2.metric("🗓️ Ngày công quy định", "22 ngày")
+    m3.metric("☀️ Công trung bình", "21.5 ngày")
+    m4.metric("🏖️ Số lượt nghỉ phép", "3 lượt")
+
+    st.markdown("---")
+
+    # 4. Các Tabs chức năng
+    tab1, tab2, tab3 = st.tabs(["📅 Bảng chấm công chi tiết", "📊 Bảng tổng hợp công", "⚙️ Quy định & Ký hiệu"])
 
     with tab1:
         st.subheader(f"Bảng chấm công chi tiết - Tháng {thang:02d}/{nam}")
         
-        # Tạo khung xem & chỉnh sửa chấm công
-        df_display = df_cb.copy()
-        
-        # Thêm mô phỏng các cột ngày trong tháng D1 -> D30
+        # Tạo các cột Ngày 01 -> Ngày 30 cho bảng chấm công
+        df_grid = df_clean.copy()
+        sundays = [6, 13, 20, 27]
         for day in range(1, 31):
-            df_display[f"Ngày {day:02d}"] = "x" if day not in [5, 6, 12, 13, 19, 20, 26, 27] else ""
-            
-        st.data_editor(df_display, use_container_width=True, height=400, num_rows="dynamic")
+            day_str = f"{day:02d}"
+            df_grid[day_str] = "x" if day not in sundays else ""
 
-        col_act1, col_act2 = st.columns([2, 8])
-        with col_act1:
-            if st.button("💾 Lưu bảng công", type="primary"):
+        # Hiển thị bảng chỉnh sửa chấm công cực kỳ gọn gàng
+        edited_df = st.data_editor(
+            df_grid,
+            use_container_width=True,
+            height=420,
+            num_rows="fixed"
+        )
+
+        st.write("")
+        col_btn1, col_btn2 = st.columns([2, 8])
+        with col_btn1:
+            if st.button("💾 Lưu bảng công", type="primary", use_container_width=True):
                 st.success("Đã lưu bảng chấm công thành công!")
-        with col_act2:
-            excel_data = generate_attendance_excel(df_cb, month=thang, year=nam)
+        with col_btn2:
+            excel_data = generate_attendance_excel(edited_df, month=thang, year=nam)
             st.download_button(
-                label="📥 Xuất file Excel Chấm Công (Theo mẫu chuẩn)",
+                label="📥 Xuất file Excel Chấm Công (Mẫu chuẩn BV)",
                 data=excel_data,
                 file_name=f"Bang_Cham_Cong_Thang_{thang:02d}_{nam}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
     with tab2:
-        st.subheader("Tổng hợp công trong tháng")
-        st.dataframe(df_cb, use_container_width=True)
+        st.subheader("Bảng tổng hợp công nhân viên")
+        df_summary = df_clean.copy()
+        df_summary["Số ngày làm hành chính"] = 22
+        df_summary["Số ngày làm T7"] = 4
+        df_summary["Số ngày làm CN"] = 0
+        df_summary["Nghỉ phép"] = 0
+        st.dataframe(df_summary, use_container_width=True)
 
     with tab3:
         st.subheader("Quy định ký hiệu chấm công")
         st.markdown("""
-        - **x**: Làm đủ ca hành chính (1 công)
-        - **xx**: Làm thêm ca / làm ngày nghỉ (2 công)
-        - **Om**: Nghỉ ốm
-        - **P**: Nghỉ phép
+        * **x**: Làm đủ ca hành chính (1 công)
+        * **xx**: Làm 2 ca / Làm ngày nghỉ (2 công)
+        * **Om**: Nghỉ ốm
+        * **P**: Nghỉ phép
+        * **Ro**: Nghỉ không lương
+        * **CT**: Đi công tác
         """)
