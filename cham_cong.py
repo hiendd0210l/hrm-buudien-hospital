@@ -33,32 +33,67 @@ def set_style(cell, font=None, fill=None, alignment=None, border=None):
     if border is not None:
         cell.border = border
 
+def autofit_column_widths(ws, min_col_width=12):
+    """Căn chỉnh độ rộng cột chuẩn xác tránh bị khuất nội dung"""
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        
+        # Chỉ xét các dòng không bị merge để tính độ rộng cột chuẩn
+        for cell in col:
+            if cell.coordinate not in ws.merged_cells and cell.value:
+                val_str = str(cell.value)
+                if len(val_str) > max_len:
+                    max_len = len(val_str)
+        
+        # Nếu cột ngày (định dạng số ngày từ 1-31) thì cho width gọn lại
+        if max_len <= 3 and col[0].column > 3:
+            ws.column_dimensions[col_letter].width = 6
+        else:
+            ws.column_dimensions[col_letter].width = max(max_len + 4, min_col_width)
+
 
 # ---------------------------------------------------------------------
-# HÀM TẠO FILE EXCEL CHUẨN ĐÚNG NGUYÊN TẮC (3 SHEET)
+# HÀM TẠO FILE EXCEL CHUẨN ĐÚNG NGUYÊN TẮC (4 SHEET: NV, HTCS, T7, ABC)
 # ---------------------------------------------------------------------
 def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: pd.DataFrame = None) -> bytes:
     wb = openpyxl.Workbook()
     
-    # Danh sách cán bộ mẫu nếu không truyền df_cb
+    # Lấy danh sách cán bộ
     nv_list = []
+    htcs_list = []  # Danh sách lao động thuê lại / HTCS
+
     if df_cb is not None and not df_cb.empty and 'khoa_phong' in df_cb.columns:
-        df_dept = df_cb[df_cb['khoa_phong'] == phong_ban].copy()
+        if phong_ban and phong_ban != "Tất cả khoa/phòng/trung tâm":
+            df_dept = df_cb[df_cb['khoa_phong'] == phong_ban].copy()
+        else:
+            df_dept = df_cb.copy()
+            
         if not df_dept.empty:
             for _, row in df_dept.iterrows():
-                nv_list.append({
+                item = {
                     "ma_cb": str(row.get('ma_can_bo', '')),
                     "ho_ten": str(row.get('ho_ten', '')),
                     "chuc_vu": str(row.get('chuc_vu', 'Nhân viên'))
-                })
+                }
+                # Phân loại HTCS nếu loai_hop_dong hoặc loai_nv có chứa 'HTCS' / 'Thuê lại'
+                loai_hd = str(row.get('loai_hop_dong', '')).upper()
+                if 'HTCS' in loai_hd or 'THUÊ LẠI' in loai_hd or 'THUE LAI' in loai_hd:
+                    htcs_list.append(item)
+                else:
+                    nv_list.append(item)
 
-    if not nv_list:
+    # Mẫu dự phòng nếu chưa có dữ liệu
+    if not nv_list and not htcs_list:
         nv_list = [
             {"ma_cb": "N1096", "ho_ten": "Nguyễn Thị Thảo Nguyên", "chuc_vu": "Bác sĩ"},
             {"ma_cb": "N1048", "ho_ten": "Đỗ Thanh Mai", "chuc_vu": "Bác sĩ"},
             {"ma_cb": "N0668", "ho_ten": "Đào Tiến Luật", "chuc_vu": "Bác sĩ"},
-            {"ma_cb": "N0418", "ho_ten": "Phạm Ngọc Mai", "chuc_vu": "Điều dưỡng"},
-            {"ma_cb": "N0162", "ho_ten": "Nguyễn Thị Mai Phương", "chuc_vu": "Điều dưỡng"}
+            {"ma_cb": "N0418", "ho_ten": "Phạm Ngọc Mai", "chuc_vu": "Điều dưỡng"}
+        ]
+        htcs_list = [
+            {"ma_cb": "HT001", "ho_ten": "Nguyễn Văn Hỗ Trợ", "chuc_vu": "Lao động thuê lại"},
+            {"ma_cb": "HT002", "ho_ten": "Trần Thị Chăm Sóc", "chuc_vu": "Lao động thuê lại"}
         ]
 
     font_title = Font(name="Arial", size=12, bold=True, color="002060")
@@ -93,97 +128,101 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     def build_work_formula(col_list, row_idx):
         if not col_list:
             return "0"
-        parts = []
-        for c in col_list:
-            parts.append(f'IF(OR({c}{row_idx}="XX",{c}{row_idx}="xx"),1,IF(OR({c}{row_idx}="X",{c}{row_idx}="x"),0.5,0))')
+        parts = [f'IF(OR({c}{row_idx}="XX",{c}{row_idx}="xx"),1,IF(OR({c}{row_idx}="X",{c}{row_idx}="x"),0.5,0))' for c in col_list]
         return " + ".join(parts)
 
     def build_duty_formula(col_list, row_idx):
         if not col_list:
             return "0"
-        parts = []
-        for c in col_list:
-            parts.append(f'IF(OR({c}{row_idx}="T",{c}{row_idx}="t"),1,0)')
+        parts = [f'IF(OR({c}{row_idx}="T",{c}{row_idx}="t"),1,0)' for c in col_list]
         return " + ".join(parts)
+
+    # Hàm dựng Bảng chấm công chính (Dùng chung cho NHÂN VIÊN & HTCS)
+    def build_main_sheet(ws, title_sheet, data_list):
+        ws.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws.cell(1, 1), font=font_subtitle)
+        ws.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} ({title_sheet})")
+        ws.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 18)
+        set_style(ws.cell(1, 4), font=font_title, alignment=align_center)
+        ws.cell(2, 1, f"Đơn vị: {phong_ban}"); set_style(ws.cell(2, 1), font=font_subtitle)
+        
+        ws.cell(3, 1, "STT"); ws.merge_cells("A3:A4")
+        ws.cell(3, 2, "Mã NV"); ws.merge_cells("B3:B4")
+        ws.cell(3, 3, "Họ và tên"); ws.merge_cells("C3:C4")
+        ws.cell(3, 4, f"Ngày làm việc trong tháng {month:02d}.{year}")
+        ws.merge_cells(start_row=3, start_column=4, end_row=3, end_column=3 + num_days)
+        
+        day_fills = {}
+        for d in range(1, num_days + 1):
+            col_idx = 3 + d
+            ws.cell(4, col_idx, f"{d:02d}")
+            fill_color, _ = get_day_type(d, month, year)
+            day_fills[col_idx] = fill_color if fill_color else fill_header_default
+
+        start_sum = 4 + num_days
+        headers_sum = [
+            "Hành chính", "Làm Thứ 7", "Làm Chủ Nhật", "Làm Lễ/Tết", 
+            "Trực Thứ 7", "Trực Chủ Nhật", "Trực Lễ/Tết", "Trực ngoài giờ",
+            "Đã nghỉ bù", "Nghỉ bù còn lại", "Thai sản", "Công tác", "Nghỉ ốm", "Đi học", "Tồn bù"
+        ]
+        for i, h in enumerate(headers_sum):
+            c_idx = start_sum + i
+            ws.cell(3, c_idx, h)
+            ws.merge_cells(start_row=3, start_column=c_idx, end_row=4, end_column=c_idx)
+
+        for r in range(3, 5):
+            for c in range(1, start_sum + len(headers_sum)):
+                cell = ws.cell(r, c)
+                f_fill = day_fills[c] if (4 <= c <= 3 + num_days and r == 4) else fill_header_default
+                set_style(cell, font=font_header, fill=f_fill, alignment=align_center)
+
+        for idx, nv in enumerate(data_list, start=5):
+            ws.cell(idx, 1, idx - 4)
+            ws.cell(idx, 2, nv["ma_cb"])
+            ws.cell(idx, 3, nv["ho_ten"])
+            
+            st_l = get_column_letter(4)
+            en_l = get_column_letter(3 + num_days)
+            
+            ws.cell(idx, start_sum, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"XX")+COUNTIF({st_l}{idx}:{en_l}{idx},"xx")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"X")+COUNTIF({st_l}{idx}:{en_l}{idx},"x"))*0.5')
+            ws.cell(idx, start_sum+1, f'={build_work_formula(sat_cols, idx)}')
+            ws.cell(idx, start_sum+2, f'={build_work_formula(sun_cols, idx)}')
+            ws.cell(idx, start_sum+3, f'={build_work_formula(hol_cols, idx)}')
+            ws.cell(idx, start_sum+4, f'={build_duty_formula(sat_cols, idx)}')
+            ws.cell(idx, start_sum+5, f'={build_duty_formula(sun_cols, idx)}')
+            ws.cell(idx, start_sum+6, f'={build_duty_formula(hol_cols, idx)}')
+            ws.cell(idx, start_sum+7, f'=COUNTIF({st_l}{idx}:{en_l}{idx},"T") + COUNTIF({st_l}{idx}:{en_l}{idx},"t")')
+            ws.cell(idx, start_sum+8, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"BB")+COUNTIF({st_l}{idx}:{en_l}{idx},"bb")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"B")+COUNTIF({st_l}{idx}:{en_l}{idx},"b"))*0.5')
+            
+            ton_col = get_column_letter(start_sum+14)
+            da_nghi_col = get_column_letter(start_sum+8)
+            ws.cell(idx, start_sum+9, f'=MAX(0, {ton_col}{idx} - {da_nghi_col}{idx})')
+            
+            ws.cell(idx, start_sum+10, f'=COUNTIF({st_l}{idx}:{en_l}{idx},"TS") + COUNTIF({st_l}{idx}:{en_l}{idx},"ts")')
+            ws.cell(idx, start_sum+11, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"CC")+COUNTIF({st_l}{idx}:{en_l}{idx},"cc")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"C")+COUNTIF({st_l}{idx}:{en_l}{idx},"c"))*0.5')
+            ws.cell(idx, start_sum+12, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"ÔÔ")+COUNTIF({st_l}{idx}:{en_l}{idx},"ôô")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"Ô")+COUNTIF({st_l}{idx}:{en_l}{idx},"ô"))*0.5')
+            ws.cell(idx, start_sum+13, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"HH")+COUNTIF({st_l}{idx}:{en_l}{idx},"hh")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"H")+COUNTIF({st_l}{idx}:{en_l}{idx},"h"))*0.5')
+            ws.cell(idx, start_sum+14, 0)
+
+            for c_idx in range(1, start_sum + len(headers_sum)):
+                cell = ws.cell(idx, c_idx)
+                f_fill = day_fills[c_idx] if (c_idx in day_fills and day_fills[c_idx] != fill_header_default) else None
+                set_style(cell, font=font_data, fill=f_fill, border=thin_border)
+                cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 4) else align_left
+        return start_sum
 
     # ==================== SHEET 1: NHÂN VIÊN ====================
     ws_nv = wb.active
     ws_nv.title = "NHÂN VIÊN"
-    
-    ws_nv.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_nv.cell(1, 1), font=font_subtitle)
-    ws_nv.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} CỦA CBNV")
-    ws_nv.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 18)
-    set_style(ws_nv.cell(1, 4), font=font_title, alignment=align_center)
-    ws_nv.cell(2, 1, f"Đơn vị: {phong_ban}"); set_style(ws_nv.cell(2, 1), font=font_subtitle)
-    
-    ws_nv.cell(3, 1, "STT"); ws_nv.merge_cells("A3:A4")
-    ws_nv.cell(3, 2, "Mã NV"); ws_nv.merge_cells("B3:B4")
-    ws_nv.cell(3, 3, "Họ và tên"); ws_nv.merge_cells("C3:C4")
-    ws_nv.cell(3, 4, f"Ngày làm việc trong tháng {month:02d}.{year}")
-    ws_nv.merge_cells(start_row=3, start_column=4, end_row=3, end_column=3 + num_days)
-    
-    day_fills = {}
-    for d in range(1, num_days + 1):
-        col_idx = 3 + d
-        ws_nv.cell(4, col_idx, f"{d:02d}")
-        fill_color, _ = get_day_type(d, month, year)
-        day_fills[col_idx] = fill_color if fill_color else fill_header_default
+    start_sum = build_main_sheet(ws_nv, "CỦA CBNV", nv_list)
 
-    start_sum = 4 + num_days
-    headers_sum = [
-        "Hành chính", "Làm Thứ 7", "Làm Chủ Nhật", "Làm Lễ/Tết", 
-        "Trực Thứ 7", "Trực Chủ Nhật", "Trực Lễ/Tết", "Trực ngoài giờ",
-        "Đã nghỉ bù", "Nghỉ bù còn lại", "Thai sản", "Công tác", "Nghỉ ốm", "Đi học", "Tồn bù"
-    ]
-    for i, h in enumerate(headers_sum):
-        c_idx = start_sum + i
-        ws_nv.cell(3, c_idx, h)
-        ws_nv.merge_cells(start_row=3, start_column=c_idx, end_row=4, end_column=c_idx)
+    # ==================== SHEET 2: HTCS (Lao động thuê lại) ====================
+    ws_htcs = wb.create_sheet(title="HTCS")
+    build_main_sheet(ws_htcs, "LAO ĐỘNG THUÊ LẠI / HTCS", htcs_list)
 
-    for r in range(3, 5):
-        for c in range(1, start_sum + len(headers_sum)):
-            cell = ws_nv.cell(r, c)
-            f_fill = day_fills[c] if (4 <= c <= 3 + num_days and r == 4) else fill_header_default
-            set_style(cell, font=font_header, fill=f_fill, alignment=align_center)
-
-    for idx, nv in enumerate(nv_list, start=5):
-        ws_nv.cell(idx, 1, idx - 4)
-        ws_nv.cell(idx, 2, nv["ma_cb"])
-        ws_nv.cell(idx, 3, nv["ho_ten"])
-        
-        st_l = get_column_letter(4)
-        en_l = get_column_letter(3 + num_days)
-        
-        ws_nv.cell(idx, start_sum, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"XX")+COUNTIF({st_l}{idx}:{en_l}{idx},"xx")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"X")+COUNTIF({st_l}{idx}:{en_l}{idx},"x"))*0.5')
-        ws_nv.cell(idx, start_sum+1, f'={build_work_formula(sat_cols, idx)}')
-        ws_nv.cell(idx, start_sum+2, f'={build_work_formula(sun_cols, idx)}')
-        ws_nv.cell(idx, start_sum+3, f'={build_work_formula(hol_cols, idx)}')
-        ws_nv.cell(idx, start_sum+4, f'={build_duty_formula(sat_cols, idx)}')
-        ws_nv.cell(idx, start_sum+5, f'={build_duty_formula(sun_cols, idx)}')
-        ws_nv.cell(idx, start_sum+6, f'={build_duty_formula(hol_cols, idx)}')
-        ws_nv.cell(idx, start_sum+7, f'=COUNTIF({st_l}{idx}:{en_l}{idx},"T") + COUNTIF({st_l}{idx}:{en_l}{idx},"t")')
-        ws_nv.cell(idx, start_sum+8, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"BB")+COUNTIF({st_l}{idx}:{en_l}{idx},"bb")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"B")+COUNTIF({st_l}{idx}:{en_l}{idx},"b"))*0.5')
-        
-        ton_col = get_column_letter(start_sum+14)
-        da_nghi_col = get_column_letter(start_sum+8)
-        ws_nv.cell(idx, start_sum+9, f'=MAX(0, {ton_col}{idx} - {da_nghi_col}{idx})')
-        
-        ws_nv.cell(idx, start_sum+10, f'=COUNTIF({st_l}{idx}:{en_l}{idx},"TS") + COUNTIF({st_l}{idx}:{en_l}{idx},"ts")')
-        ws_nv.cell(idx, start_sum+11, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"CC")+COUNTIF({st_l}{idx}:{en_l}{idx},"cc")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"C")+COUNTIF({st_l}{idx}:{en_l}{idx},"c"))*0.5')
-        ws_nv.cell(idx, start_sum+12, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"ÔÔ")+COUNTIF({st_l}{idx}:{en_l}{idx},"ôô")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"Ô")+COUNTIF({st_l}{idx}:{en_l}{idx},"ô"))*0.5')
-        ws_nv.cell(idx, start_sum+13, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"HH")+COUNTIF({st_l}{idx}:{en_l}{idx},"hh")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"H")+COUNTIF({st_l}{idx}:{en_l}{idx},"h"))*0.5')
-        ws_nv.cell(idx, start_sum+14, 0)
-
-        for c_idx in range(1, start_sum + len(headers_sum)):
-            cell = ws_nv.cell(idx, c_idx)
-            f_fill = day_fills[c_idx] if (c_idx in day_fills and day_fills[c_idx] != fill_header_default) else None
-            set_style(cell, font=font_data, fill=f_fill, border=thin_border)
-            cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 4) else align_left
-
-    # ==================== SHEET 2: LÀM THỨ 7 ====================
+    # ==================== SHEET 3: LÀM THỨ 7 ====================
     ws_t7 = wb.create_sheet(title="LÀM THỨ 7")
     ws_t7.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_t7.cell(1, 1), font=font_subtitle)
-    ws_t7.cell(1, 4, f"BẢNG CHẤM CÔNG NGÀY LÀM THỨ 7, CHỦ NHẬT & NGÀY LỄ CỦA CBNV THÁNG {month:02d}/{year}")
+    ws_t7.cell(1, 4, f"BẢNG CHẤM CÔNG NGÀY LÀM THỨ 7, CHỦ NHẬT & NGÀY LỄ THÁNG {month:02d}/{year}")
     
     weekend_days = []
     for d in range(1, num_days + 1):
@@ -207,7 +246,8 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     ws_t7.cell(3, tot_col, "Tổng ngày công")
     set_style(ws_t7.cell(3, tot_col), font=font_header, fill=fill_header_default, alignment=align_center)
 
-    for idx, nv in enumerate(nv_list, start=4):
+    all_comb_list = nv_list + htcs_list
+    for idx, nv in enumerate(all_comb_list, start=4):
         ws_t7.cell(idx, 1, idx - 3)
         ws_t7.cell(idx, 2, nv["ma_cb"])
         ws_t7.cell(idx, 3, nv["ho_ten"])
@@ -222,7 +262,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             set_style(cell, font=font_data, fill=fill_color, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 4) else align_left
 
-    # ==================== SHEET 3: ABC ====================
+    # ==================== SHEET 4: ABC ====================
     ws_abc = wb.create_sheet(title="ABC")
     ws_abc.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_abc.cell(1, 1), font=font_subtitle)
     ws_abc.cell(2, 1, f"Đơn vị: {phong_ban}"); set_style(ws_abc.cell(2, 1), font=font_subtitle)
@@ -263,12 +303,10 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             set_style(cell, font=font_data, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 5) else align_left
 
+    # Tự động căn chỉnh độ rộng cột tất cả các sheet
     for ws in wb.worksheets:
         ws.views.sheetView[0].showGridLines = True
-        for col in ws.columns:
-            max_len = max(len(str(cell.value or '')) for cell in col)
-            col_letter = get_column_letter(col[0].column)
-            ws.column_dimensions[col_letter].width = max(max_len + 3, 10)
+        autofit_column_widths(ws)
 
     output = io.BytesIO()
     wb.save(output)
@@ -276,35 +314,59 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
 
 
 # ---------------------------------------------------------------------
+# HÀM SẮP XẾP DANH SÁCH ĐƠN VỊ ĐÚNG THỨ TỰ YÊU CẦU
+# ---------------------------------------------------------------------
+def get_ordered_phong_ban_list(df_cb):
+    list_phong = []
+    list_khoa = []
+    list_trung_tam = []
+    
+    if isinstance(df_cb, pd.DataFrame) and not df_cb.empty and "khoa_phong" in df_cb.columns:
+        unique_kp = [str(kp).strip() for kp in df_cb["khoa_phong"].dropna().unique() if str(kp).strip()]
+        for kp in unique_kp:
+            kp_lower = kp.lower()
+            if "phòng" in kp_lower or "phong" in kp_lower:
+                list_phong.append(kp)
+            elif "trung tâm" in kp_lower or "trung tam" in kp_lower:
+                list_trung_tam.append(kp)
+            else:
+                list_khoa.append(kp)
+                
+    # Mẫu dự phòng nếu hệ thống chưa load dữ liệu cán bộ
+    if not list_phong and not list_khoa and not list_trung_tam:
+        list_phong = ["Phòng Tổ chức Cán bộ", "Phòng Kế hoạch Tổng hợp", "Phòng Tài chính Kế toán"]
+        list_khoa = ["Khoa Cấp cứu", "Khoa Khám bệnh", "Khoa Ngoại tổng hợp", "Khoa Nội tổng hợp"]
+        list_trung_tam = ["Trung tâm Đột quỵ", "Trung tâm Y học hạt nhân"]
+
+    list_phong.sort(key=lambda x: x.lower())
+    list_khoa.sort(key=lambda x: x.lower())
+    list_trung_tam.sort(key=lambda x: x.lower())
+
+    ordered_list = ["Tất cả khoa/phòng/trung tâm"] + list_phong + list_khoa + list_trung_tam
+    return ordered_list
+
+
+# ---------------------------------------------------------------------
 # HÀM HIỂN THỊ GIAO DIỆN STREAMLIT DASHBOARD TÍCH HỢP
 # ---------------------------------------------------------------------
 def render_quan_ly_cham_cong(df_cb=None):
     st.title("📋 Quản lý & Xuất Bảng Chấm Công Bệnh Viện")
-    st.caption("Khởi tạo file Excel chấm công chuẩn 3 Sheet (NHÂN VIÊN, LÀM THỨ 7, ABC) theo quy định Bệnh viện Bưu điện")
+    st.caption("Khởi tạo file Excel chấm công chuẩn 4 Sheet (NHÂN VIÊN, HTCS, LÀM THỨ 7, ABC) theo quy định Bệnh viện Bưu điện")
 
-    # Lấy dữ liệu cán bộ từ session nếu không được truyền vào
     if df_cb is None:
         df_cb = st.session_state.get("df_can_bo", pd.DataFrame())
 
-    # Lọc danh sách khoa phòng
-    danh_sach_phong_ban = ["Tất cả Khoa / Phòng"]
-    if isinstance(df_cb, pd.DataFrame) and not df_cb.empty and "khoa_phong" in df_cb.columns:
-        list_kp = [kp for kp in df_cb["khoa_phong"].dropna().unique() if str(kp).strip()]
-        danh_sach_phong_ban.extend(list_kp)
-    if len(danh_sach_phong_ban) == 1:
-        danh_sach_phong_ban = ["Khoa Khám bệnh", "Khoa Cấp cứu", "Khoa Ngoại", "Khoa Nội", "Phòng TỔ CHỨC CÁN BỘ"]
+    # Lấy danh sách Đơn vị theo thứ tự ưu tiên: Tất cả -> Phòng -> Khoa -> Trung tâm
+    danh_sach_don_vi = get_ordered_phong_ban_list(df_cb)
 
-    # Thanh cấu hình thông số
-    st.subheader("⚙️ Cấu hình bảng chấm công xuất Excel")
+    st.subheader("⚙️ Cấu hình thông số xuất file")
     col1, col2, col3 = st.columns(3)
     with col1:
         month = st.number_input("Tháng chấm công", min_value=1, max_value=12, value=datetime.now().month)
     with col2:
         year = st.number_input("Năm chấm công", min_value=2020, max_value=2030, value=datetime.now().year)
     with col3:
-        phong_ban_selected = st.selectbox("Khoa / Phòng ban xuất dữ liệu", options=danh_sach_phong_ban)
-
-    phong_ban_export = phong_ban_selected if phong_ban_selected != "Tất cả Khoa / Phòng" else "Khoa Khám bệnh"
+        don_vi_selected = st.selectbox("Đơn vị xuất dữ liệu", options=danh_sach_don_vi)
 
     # Hiển thị Metrics tổng quan
     st.markdown("---")
@@ -312,74 +374,73 @@ def render_quan_ly_cham_cong(df_cb=None):
     
     total_nv = 0
     if isinstance(df_cb, pd.DataFrame) and not df_cb.empty and "khoa_phong" in df_cb.columns:
-        if phong_ban_selected == "Tất cả Khoa / Phòng":
+        if don_vi_selected == "Tất cả khoa/phòng/trung tâm":
             total_nv = len(df_cb)
         else:
-            total_nv = len(df_cb[df_cb["khoa_phong"] == phong_ban_selected])
+            total_nv = len(df_cb[df_cb["khoa_phong"] == don_vi_selected])
     else:
-        total_nv = 5
+        total_nv = 6
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Tổng cán bộ/nhân viên", f"{total_nv} người")
     m2.metric("Số ngày trong tháng", f"{num_days} ngày")
     m3.metric("Tháng/Năm áp dụng", f"T{month:02d}/{year}")
-    m4.metric("Cấu trúc File Excel", "3 Sheets chuẩn")
+    m4.metric("Cấu trúc File Excel", "4 Sheets chuẩn (Thêm HTCS)")
+
+    # Tự động khởi tạo lại dữ liệu file Excel ngay khi người dùng chọn đơn vị mới
+    excel_data = generate_excel_mau_cham_cong(month, year, don_vi_selected, df_cb)
 
     # Tabs chức năng
     tab1, tab2, tab3 = st.tabs(["📥 Xuất file Excel chấm công", "📜 Quy ước Ký hiệu Chấm công", "👥 Danh sách nhân sự"])
 
     with tab1:
         st.write("### Tải xuống Bảng chấm công mẫu Excel")
-        st.info("File Excel xuất ra sẽ chứa đầy đủ các công thức tự động tính ngày công (`COUNTIF`), nghỉ bù, xếp loại ABC và định dạng màu phân biệt Ngày lễ / Thứ 7 / Chủ nhật.")
+        st.info("File Excel xuất ra chứa đầy đủ 4 Sheets: **NHÂN VIÊN**, **HTCS (Thuê lại)**, **LÀM THỨ 7** và **ABC** với công thức tính ngày công, nghỉ bù và định dạng tự động.")
         
+        file_name_clean = don_vi_selected.replace("Tất cả khoa/phòng/trung tâm", "Tat_Ca_Khoa_Phong").replace(" ", "_").replace("/", "_")
+        target_file_name = f"Bang_Cham_Cong_{file_name_clean}_T{month:02d}_{year}.xlsx"
+
         col_btn1, col_btn2 = st.columns([2, 3])
         with col_btn1:
             if st.button("🚀 Khởi tạo & Tạo File Excel", type="primary", use_container_width=True):
-                with st.spinner("Đang tổng hợp công thức và tạo file Excel..."):
-                    excel_bytes = generate_excel_mau_cham_cong(month, year, phong_ban_export, df_cb)
-                    st.session_state["cham_cong_excel_bytes"] = excel_bytes
-                    st.success("Khởi tạo bảng chấm công thành công!")
+                st.session_state["cham_cong_excel_bytes"] = excel_data
+                st.session_state["cham_cong_file_name"] = target_file_name
+                st.success("Tạo bảng chấm công thành công!")
 
         with col_btn2:
-            if "cham_cong_excel_bytes" in st.session_state:
-                st.download_button(
-                    label="📥 Tải xuống File Excel (.xlsx)",
-                    data=st.session_state["cham_cong_excel_bytes"],
-                    file_name=f"Bang_Cham_Cong_{phong_ban_export.replace(' ', '_')}_T{month:02d}_{year}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+            # Ưu tiên lấy file từ session state nếu vừa tạo, hoặc dùng dữ liệu vừa khởi tạo
+            download_bytes = st.session_state.get("cham_cong_excel_bytes", excel_data)
+            download_name = st.session_state.get("cham_cong_file_name", target_file_name)
+            
+            st.download_button(
+                label=f"📥 Tải xuống File Excel (.xlsx)",
+                data=download_bytes,
+                file_name=download_name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
 
     with tab2:
         st.write("### Quy ước Ký hiệu dùng trong Bảng Chấm Công")
         ky_hieu_data = {
             "Ký hiệu": ["X", "XX", "T", "P", "PP", "B", "BB", "TS", "Ô", "ÔÔ", "C", "CC", "H", "HH"],
             "Diễn giải": [
-                "Làm việc nửa ngày (0.5 công)",
-                "Làm việc cả ngày (1.0 công)",
-                "Trực ngày/đêm ngoài giờ",
-                "Nghỉ phép nửa ngày",
-                "Nghỉ phép cả ngày",
-                "Nghỉ bù nửa ngày",
-                "Nghỉ bù cả ngày",
-                "Nghỉ thai sản",
-                "Nghỉ ốm nửa ngày",
-                "Nghỉ ốm cả ngày",
-                "Đi công tác nửa ngày",
-                "Đi công tác cả ngày",
-                "Đi học nửa ngày",
-                "Đi học cả ngày"
+                "Làm việc nửa ngày (0.5 công)", "Làm việc cả ngày (1.0 công)",
+                "Trực ngày/đêm ngoài giờ", "Nghỉ phép nửa ngày", "Nghỉ phép cả ngày",
+                "Nghỉ bù nửa ngày", "Nghỉ bù cả ngày", "Nghỉ thai sản",
+                "Nghỉ ốm nửa ngày", "Nghỉ ốm cả ngày", "Đi công tác nửa ngày",
+                "Đi công tác cả ngày", "Đi học nửa ngày", "Đi học cả ngày"
             ],
             "Quy đổi công": ["0.5", "1.0", "Trực", "Phép", "Phép", "Bù", "Bù", "Thai sản", "Ốm", "Ốm", "Công tác", "Công tác", "Đi học", "Đi học"]
         }
         st.dataframe(pd.DataFrame(ky_hieu_data), use_container_width=True, hide_index=True)
 
     with tab3:
-        st.write(f"### Danh sách Nhân sự thuộc: **{phong_ban_selected}**")
+        st.write(f"### Danh sách Nhân sự thuộc: **{don_vi_selected}**")
         if isinstance(df_cb, pd.DataFrame) and not df_cb.empty:
             df_display = df_cb.copy()
-            if phong_ban_selected != "Tất cả Khoa / Phòng" and "khoa_phong" in df_display.columns:
-                df_display = df_display[df_display["khoa_phong"] == phong_ban_selected]
+            if don_vi_selected != "Tất cả khoa/phòng/trung tâm" and "khoa_phong" in df_display.columns:
+                df_display = df_display[df_display["khoa_phong"] == don_vi_selected]
             st.dataframe(df_display, use_container_width=True)
         else:
             st.warning("Hiện chưa có dữ liệu cán bộ trong hệ thống. Hệ thống sẽ xuất file Excel với danh sách cán bộ mẫu.")
