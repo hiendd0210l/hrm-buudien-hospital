@@ -8,16 +8,9 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 def get_day_fill(day: int, month: int, year: int):
-    """
-    Xác định PatternFill cho từng ngày:
-    - Lễ/Tết: Đỏ nhạt (FFC7CE)
-    - Thứ 7 / Chủ Nhật: Cam nhạt (FCE4D6)
-    - Ngày thường: None
-    """
     dt = date(year, month, day)
     weekday = dt.weekday()  # 5: Thứ 7, 6: Chủ nhật
     
-    # Lễ Tết cố định (01/01, 30/04, 01/05, 02/09, 03/09)
     fixed_holidays = [(1, 1), (30, 4), (1, 5), (2, 9), (3, 9)]
     
     if (day, month) in fixed_holidays:
@@ -26,15 +19,15 @@ def get_day_fill(day: int, month: int, year: int):
         return PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
     return None
 
-def apply_cell_style(cell, font=None, fill=None, alignment=None, border=None):
-    """Hàm gán style an toàn tránh lỗi AttributeError của openpyxl"""
-    if font:
+def set_style(cell, font=None, fill=None, alignment=None, border=None):
+    """Gán trực tiếp đối tượng style chuẩn để tránh AttributeError"""
+    if font is not None:
         cell.font = font
-    if fill:
+    if fill is not None:
         cell.fill = fill
-    if alignment:
+    if alignment is not None:
         cell.alignment = alignment
-    if border:
+    if border is not None:
         cell.border = border
 
 def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa Ngoại Tổng hợp") -> bytes:
@@ -61,18 +54,16 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     
     num_days = calendar.monthrange(year, month)[1]
 
-    # ---------------------------------------------------------------------
     # TAB 1: NHÂN VIÊN
-    # ---------------------------------------------------------------------
     ws_nv = wb.active
     ws_nv.title = "NHÂN VIÊN"
     
-    apply_cell_style(ws_nv.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"), font=font_subtitle)
+    set_style(ws_nv.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"), font=font_subtitle)
     ws_nv.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 13)
     c_title = ws_nv.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} CỦA CBNV")
-    apply_cell_style(c_title, font=font_title, alignment=align_center)
+    set_style(c_title, font=font_title, alignment=align_center)
     
-    apply_cell_style(ws_nv.cell(2, 1, f"Đơn vị: {phong_ban}"), font=font_subtitle)
+    set_style(ws_nv.cell(2, 1, f"Đơn vị: {phong_ban}"), font=font_subtitle)
     
     ws_nv.merge_cells("A3:A4"); ws_nv.cell(3, 1, "STT")
     ws_nv.merge_cells("B3:B4"); ws_nv.cell(3, 2, "Mã NV")
@@ -85,19 +76,15 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     for d in range(1, num_days + 1):
         col_idx = 3 + d
         ws_nv.cell(4, col_idx, f"{d:02d}")
-        
         fill_color = get_day_fill(d, month, year)
-        if fill_color:
-            day_fills[col_idx] = fill_color
-        else:
-            day_fills[col_idx] = fill_header_default
+        day_fills[col_idx] = fill_color if fill_color else fill_header_default
 
     start_sum_col = 4 + num_days
     ws_nv.merge_cells(start_row=3, start_column=start_sum_col, end_row=4, end_column=start_sum_col); ws_nv.cell(3, start_sum_col, "Hành chính")
     ws_nv.merge_cells(start_row=3, start_column=start_sum_col+1, end_row=4, end_column=start_sum_col+1); ws_nv.cell(3, start_sum_col+1, "Trực ngoài giờ")
     ws_nv.merge_cells(start_row=3, start_column=start_sum_col+2, end_row=3, end_column=start_sum_col+3); ws_nv.cell(3, start_sum_col+2, "Nghỉ bù")
-    apply_cell_style(ws_nv.cell(4, start_sum_col+2, "Đã nghỉ"), font=font_sub_header)
-    apply_cell_style(ws_nv.cell(4, start_sum_col+3, "Còn lại"), font=font_sub_header)
+    set_style(ws_nv.cell(4, start_sum_col+2, "Đã nghỉ"), font=font_sub_header)
+    set_style(ws_nv.cell(4, start_sum_col+3, "Còn lại"), font=font_sub_header)
     ws_nv.merge_cells(start_row=3, start_column=start_sum_col+4, end_row=4, end_column=start_sum_col+4); ws_nv.cell(3, start_sum_col+4, "Thai sản")
     ws_nv.merge_cells(start_row=3, start_column=start_sum_col+5, end_row=4, end_column=start_sum_col+5); ws_nv.cell(3, start_sum_col+5, "Công tác, họp")
     ws_nv.merge_cells(start_row=3, start_column=start_sum_col+6, end_row=4, end_column=start_sum_col+6); ws_nv.cell(3, start_sum_col+6, "Nghỉ ốm")
@@ -109,35 +96,30 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
         for c in range(1, start_sum_col + 10):
             cell = ws_nv.cell(r, c)
             f_font = font_sub_header if (r == 4 and c in [start_sum_col+2, start_sum_col+3]) else font_header
-            
-            if 4 <= c <= 3 + num_days and r == 4:
-                apply_cell_style(cell, font=f_font, fill=day_fills[c], alignment=align_center)
-            else:
-                apply_cell_style(cell, font=f_font, fill=fill_header_default, alignment=align_center)
+            f_fill = day_fills[c] if (4 <= c <= 3 + num_days and r == 4) else fill_header_default
+            set_style(cell, font=f_font, fill=f_fill, alignment=align_center)
 
     for r_idx in range(5, 20):
-        apply_cell_style(ws_nv.cell(r_idx, 1, r_idx - 4), alignment=align_center_no_wrap)
+        set_style(ws_nv.cell(r_idx, 1, r_idx - 4), alignment=align_center_no_wrap)
         for c_idx in range(1, start_sum_col + 10):
             cell = ws_nv.cell(r_idx, c_idx)
             f_fill = day_fills[c_idx] if (c_idx in day_fills and day_fills[c_idx] != fill_header_default) else None
-            apply_cell_style(cell, font=font_data, fill=f_fill, border=thin_border)
+            set_style(cell, font=font_data, fill=f_fill, border=thin_border)
             if c_idx >= 4:
                 cell.alignment = align_center_no_wrap
 
     sign_row = 22
-    apply_cell_style(ws_nv.cell(sign_row, 3, "Lãnh đạo đơn vị"), font=font_bold)
-    apply_cell_style(ws_nv.cell(sign_row, start_sum_col + 4, "Người lập biểu"), font=font_bold)
+    set_style(ws_nv.cell(sign_row, 3, "Lãnh đạo đơn vị"), font=font_bold)
+    set_style(ws_nv.cell(sign_row, start_sum_col + 4, "Người lập biểu"), font=font_bold)
 
-    # ---------------------------------------------------------------------
     # TAB 2: HTCS
-    # ---------------------------------------------------------------------
     ws_htcs = wb.create_sheet(title="HTCS")
-    apply_cell_style(ws_htcs.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"), font=font_subtitle)
+    set_style(ws_htcs.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"), font=font_subtitle)
     ws_htcs.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 11)
     c_htcs_t = ws_htcs.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} CỦA NHÂN VIÊN LAO ĐỘNG THUÊ LẠI")
-    apply_cell_style(c_htcs_t, font=font_title, alignment=align_center)
+    set_style(c_htcs_t, font=font_title, alignment=align_center)
     
-    apply_cell_style(ws_htcs.cell(2, 1, f"Đơn vị: {phong_ban}"), font=font_subtitle)
+    set_style(ws_htcs.cell(2, 1, f"Đơn vị: {phong_ban}"), font=font_subtitle)
 
     ws_htcs.merge_cells("A3:A4"); ws_htcs.cell(3, 1, "STT")
     ws_htcs.merge_cells("B3:B4"); ws_htcs.cell(3, 2, "Mã NV")
@@ -155,8 +137,8 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
     ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+2, end_row=4, end_column=start_sum_col+2); ws_htcs.cell(3, start_sum_col+2, "Trực cuối tuần")
     ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+3, end_row=4, end_column=start_sum_col+3); ws_htcs.cell(3, start_sum_col+3, "Trực ngày lễ")
     ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+4, end_row=3, end_column=start_sum_col+5); ws_htcs.cell(3, start_sum_col+4, "Nghỉ bù")
-    apply_cell_style(ws_htcs.cell(4, start_sum_col+4, "Đã nghỉ"), font=font_sub_header)
-    apply_cell_style(ws_htcs.cell(4, start_sum_col+5, "Còn lại"), font=font_sub_header)
+    set_style(ws_htcs.cell(4, start_sum_col+4, "Đã nghỉ"), font=font_sub_header)
+    set_style(ws_htcs.cell(4, start_sum_col+5, "Còn lại"), font=font_sub_header)
     ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+6, end_row=4, end_column=start_sum_col+6); ws_htcs.cell(3, start_sum_col+6, "Làm cuối tuần")
     ws_htcs.merge_cells(start_row=3, start_column=start_sum_col+7, end_row=4, end_column=start_sum_col+7); ws_htcs.cell(3, start_sum_col+7, "Nghỉ ốm")
 
@@ -164,77 +146,68 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
         for c in range(1, start_sum_col + 8):
             cell = ws_htcs.cell(r, c)
             f_font = font_sub_header if (r == 4 and c in [start_sum_col+4, start_sum_col+5]) else font_header
-            
-            if 4 <= c <= 3 + num_days and r == 4:
-                apply_cell_style(cell, font=f_font, fill=day_fills[c], alignment=align_center)
-            else:
-                apply_cell_style(cell, font=f_font, fill=fill_header_default, alignment=align_center)
+            f_fill = day_fills[c] if (4 <= c <= 3 + num_days and r == 4) else fill_header_default
+            set_style(cell, font=f_font, fill=f_fill, alignment=align_center)
 
     for r_idx in range(5, 20):
-        apply_cell_style(ws_htcs.cell(r_idx, 1, r_idx - 4), alignment=align_center_no_wrap)
+        set_style(ws_htcs.cell(r_idx, 1, r_idx - 4), alignment=align_center_no_wrap)
         for c_idx in range(1, start_sum_col + 8):
             cell = ws_htcs.cell(r_idx, c_idx)
             f_fill = day_fills[c_idx] if (c_idx in day_fills and day_fills[c_idx] != fill_header_default) else None
-            apply_cell_style(cell, font=font_data, fill=f_fill, border=thin_border)
+            set_style(cell, font=font_data, fill=f_fill, border=thin_border)
             if c_idx >= 4:
                 cell.alignment = align_center_no_wrap
 
-    apply_cell_style(ws_htcs.cell(sign_row, 3, "Lãnh đạo đơn vị"), font=font_bold)
-    apply_cell_style(ws_htcs.cell(sign_row, start_sum_col + 3, "Người lập biểu"), font=font_bold)
+    set_style(ws_htcs.cell(sign_row, 3, "Lãnh đạo đơn vị"), font=font_bold)
+    set_style(ws_htcs.cell(sign_row, start_sum_col + 3, "Người lập biểu"), font=font_bold)
 
-    # ---------------------------------------------------------------------
     # TAB 3: LÀM THỨ 7
-    # ---------------------------------------------------------------------
     ws_t7 = wb.create_sheet(title="LÀM THỨ 7")
-    apply_cell_style(ws_t7.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"), font=font_subtitle)
+    set_style(ws_t7.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"), font=font_subtitle)
     ws_t7.merge_cells("A1:I1")
     c_t7 = ws_t7.cell(1, 4, f"BẢNG CHẤM CÔNG NGÀY LÀM THỨ 7, CHỦ NHẬT CỦA CBNV THÁNG {month:02d}/{year}")
-    apply_cell_style(c_t7, font=font_title, alignment=align_center)
+    set_style(c_t7, font=font_title, alignment=align_center)
 
-    apply_cell_style(ws_t7.cell(2, 1, f"Đơn vị: {phong_ban}"), font=font_subtitle)
+    set_style(ws_t7.cell(2, 1, f"Đơn vị: {phong_ban}"), font=font_subtitle)
 
     headers_t7 = ["STT", "Mã NV", "Họ và tên", "Ngày làm 1", "Ngày làm 2", "Ngày làm 3", "Ngày làm 4", "Ngày làm 5", "Tổng ngày"]
     for col_i, h in enumerate(headers_t7, 1):
         c = ws_t7.cell(3, col_i, h)
-        apply_cell_style(c, font=font_header, fill=fill_header_default, alignment=align_center)
+        set_style(c, font=font_header, fill=fill_header_default, alignment=align_center)
 
     for r_idx in range(4, 18):
-        apply_cell_style(ws_t7.cell(r_idx, 1, r_idx - 3), alignment=align_center_no_wrap)
+        set_style(ws_t7.cell(r_idx, 1, r_idx - 3), alignment=align_center_no_wrap)
         for c_idx in range(1, 10):
             cell = ws_t7.cell(r_idx, c_idx)
-            apply_cell_style(cell, font=font_data, border=thin_border)
+            set_style(cell, font=font_data, border=thin_border)
             if c_idx >= 4:
                 cell.alignment = align_center_no_wrap
 
-    apply_cell_style(ws_t7.cell(20, 3, "Lãnh đạo đơn vị"), font=font_bold)
-    apply_cell_style(ws_t7.cell(20, 7, "Người lập biểu"), font=font_bold)
+    set_style(ws_t7.cell(20, 3, "Lãnh đạo đơn vị"), font=font_bold)
+    set_style(ws_t7.cell(20, 7, "Người lập biểu"), font=font_bold)
 
-    # ---------------------------------------------------------------------
     # TAB 4: ABC
-    # ---------------------------------------------------------------------
     ws_abc = wb.create_sheet(title="ABC")
-    apply_cell_style(ws_abc.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"), font=font_subtitle)
-    apply_cell_style(ws_abc.cell(2, 1, f"Đơn vị: {phong_ban}"), font=font_subtitle)
+    set_style(ws_abc.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"), font=font_subtitle)
+    set_style(ws_abc.cell(2, 1, f"Đơn vị: {phong_ban}"), font=font_subtitle)
     ws_abc.merge_cells("A3:J3")
     c_abc = ws_abc.cell(3, 1, f"BẢNG BÌNH BẦU XẾP LOẠI LAO ĐỘNG THÁNG {month:02d}/{year}")
-    apply_cell_style(c_abc, font=font_title, alignment=align_center)
+    set_style(c_abc, font=font_title, alignment=align_center)
 
     headers_abc = ["STT", "Mã NV", "HỌ VÀ TÊN", "CHỨC VỤ", "ĐI LÀM", "TRỰC", "NGHỈ BÙ", "NGHỈ KHÁC", "XẾP LOẠI", "TỒN BÙ"]
     for col_i, h in enumerate(headers_abc, 1):
         c = ws_abc.cell(5, col_i, h)
-        apply_cell_style(c, font=font_header, fill=fill_header_default, alignment=align_center)
+        set_style(c, font=font_header, fill=fill_header_default, alignment=align_center)
 
     for r_idx in range(6, 20):
-        apply_cell_style(ws_abc.cell(r_idx, 1, r_idx - 5), alignment=align_center_no_wrap)
+        set_style(ws_abc.cell(r_idx, 1, r_idx - 5), alignment=align_center_no_wrap)
         for c_idx in range(1, 11):
             cell = ws_abc.cell(r_idx, c_idx)
-            apply_cell_style(cell, font=font_data, border=thin_border)
+            set_style(cell, font=font_data, border=thin_border)
 
-    # ---------------------------------------------------------------------
     # TAB 5: KÝ HIỆU CHẤM CÔNG
-    # ---------------------------------------------------------------------
     ws_kh = wb.create_sheet(title="Ký hiệu")
-    apply_cell_style(ws_kh.cell(1, 1, "BẢNG GIẢI THÍCH KÝ HIỆU CHẤM CÔNG"), font=font_title)
+    set_style(ws_kh.cell(1, 1, "BẢNG GIẢI THÍCH KÝ HIỆU CHẤM CÔNG"), font=font_title)
     
     ky_hieu_data = [
         ("X", "công đi làm 1/2 ngày trong giờ hành chính"),
@@ -257,16 +230,15 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str = "Khoa N
         ("RR", "Nghỉ việc riêng hưởng lương cơ bản 1 ngày")
     ]
     
-    apply_cell_style(ws_kh.cell(3, 1, "Ký hiệu"), font=font_header, fill=fill_header_default, alignment=align_center)
-    apply_cell_style(ws_kh.cell(3, 2, "Diễn giải ý nghĩa"), font=font_header, fill=fill_header_default, alignment=align_center)
+    set_style(ws_kh.cell(3, 1, "Ký hiệu"), font=font_header, fill=fill_header_default, alignment=align_center)
+    set_style(ws_kh.cell(3, 2, "Diễn giải ý nghĩa"), font=font_header, fill=fill_header_default, alignment=align_center)
     
     for r_idx, (kh, val) in enumerate(ky_hieu_data, start=4):
         c_kh = ws_kh.cell(r_idx, 1, kh)
         c_val = ws_kh.cell(r_idx, 2, val)
-        apply_cell_style(c_kh, font=font_header, alignment=align_center)
-        apply_cell_style(c_val, font=font_data)
+        set_style(c_kh, font=font_header, alignment=align_center)
+        set_style(c_val, font=font_data)
 
-    # Tự động căn chỉnh độ rộng cột
     for ws_curr in wb.worksheets:
         for col in ws_curr.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
@@ -372,15 +344,17 @@ def render_quan_ly_cham_cong(df_cb):
             
         sel_dept = st.selectbox("Tên Khoa / Phòng tạo bảng chấm công:", dept_list)
         
-        excel_bytes = generate_excel_mau_cham_cong(sel_month, sel_year, sel_dept)
-        
-        st.download_button(
-            label=f"📥 Tải File Excel Mẫu Chấm Công Tháng {sel_month:02d}/{sel_year} ({sel_dept})",
-            data=excel_bytes,
-            file_name=f"Mau_Bang_Cham_Cong_{sel_dept.replace(' ', '_')}_T{sel_month:02d}_{sel_year}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+        try:
+            excel_bytes = generate_excel_mau_cham_cong(sel_month, sel_year, sel_dept)
+            st.download_button(
+                label=f"📥 Tải File Excel Mẫu Chấm Công Tháng {sel_month:02d}/{sel_year} ({sel_dept})",
+                data=excel_bytes,
+                file_name=f"Mau_Bang_Cham_Cong_{sel_dept.replace(' ', '_')}_T{sel_month:02d}_{sel_year}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        except Exception as e:
+            st.error(f"Lỗi khởi tạo file Excel: {e}")
 
         st.markdown("---")
         st.markdown("##### 📥 **2. Tải lên Bảng Chấm Công đã chấm từ các Đơn vị**")
