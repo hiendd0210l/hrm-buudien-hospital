@@ -4,15 +4,14 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import io
-import plotly.express as px
 
-# Config trang Streamlit
-st.set_page_config(page_title="Quản lý Chấm công & Ngày nghỉ", layout="wide", page_icon="📋")
-
-# ==============================================================================
-# HÀM XUẤT FILE EXCEL MẪU CHUẨN CỦA BỆNH VIỆN BƯU ĐIỆN
-# ==============================================================================
 def generate_attendance_excel(df_employees, unit_name="Phòng Công nghệ thông tin", month=9, year=2026):
+    """
+    Hàm xuất file Excel chấm công chuẩn BV Bưu Điện:
+    1. Xóa bỏ hoàn toàn cột "Tồn bù"
+    2. Căn độ rộng cột "Họ và tên" là 25pt trên các sheet
+    3. Tự động đồng bộ dữ liệu và công thức sang sheet "LÀM THỨ 7"
+    """
     wb = openpyxl.Workbook()
     
     # Tạo các Sheets
@@ -46,7 +45,7 @@ def generate_attendance_excel(df_employees, unit_name="Phòng Công nghệ thôn
     sundays = [6, 13, 20, 27]
 
     # -------------------------------------------------------------
-    # 1. SHEET "NHÂN VIÊN" (Đã loại bỏ cột Tồn bù)
+    # 1. SHEET "NHÂN VIÊN"
     # -------------------------------------------------------------
     ws_main['A1'] = "BỆNH VIỆN BƯU ĐIỆN"
     ws_main['A1'].font = Font(name="Arial", size=10, bold=True)
@@ -99,8 +98,8 @@ def generate_attendance_excel(df_employees, unit_name="Phòng Công nghệ thôn
         row = start_row + idx
         ws_main[f"A{row}"] = idx + 1
         
-        ma_nv = row_data.get("Mã NV", f"N{1000+idx}")
-        ho_ten = row_data.get("Họ và tên", "")
+        ma_nv = row_data.get("Mã NV", row_data.get("ma_cb", f"N{1000+idx}"))
+        ho_ten = row_data.get("Họ và tên", row_data.get("ho_ten", ""))
         
         ws_main[f"B{row}"] = ma_nv
         ws_main[f"C{row}"] = ho_ten
@@ -116,7 +115,7 @@ def generate_attendance_excel(df_employees, unit_name="Phòng Công nghệ thôn
         ws_main[f"AI{row}"] = f'=LÀM THỨ 7!AH{row}'
         
         for col_let in ["AJ", "AK", "AL", "AM", "AN", "AO", "AP", "AQ", "AR", "AS", "AT", "AU", "AV"]:
-            ws_main[f"{col_let}{row}"] = f'=COUNTIF(D{row}:AG{row}, "{col_let}")' if col_let in ["AR", "AS", "AT", "AU"] else 0
+            ws_main[f"{col_let}{row}"] = 0
 
         for c in range(1, 49):
             cell = ws_main.cell(row=row, column=c)
@@ -128,7 +127,7 @@ def generate_attendance_excel(df_employees, unit_name="Phòng Công nghệ thôn
 
     ws_main.column_dimensions['A'].width = 5
     ws_main.column_dimensions['B'].width = 10
-    ws_main.column_dimensions['C'].width = 25  # Độ rộng 25pt
+    ws_main.column_dimensions['C'].width = 25  # Độ rộng 25pt cho Họ và tên
     for day in range(1, 31):
         ws_main.column_dimensions[get_column_letter(3 + day)].width = 3.5
     for title, col_let in summary_headers:
@@ -177,8 +176,8 @@ def generate_attendance_excel(df_employees, unit_name="Phòng Công nghệ thôn
     for idx, row_data in df_employees.reset_index(drop=True).iterrows():
         row = start_row + idx
         ws_t7[f"A{row}"] = idx + 1
-        ws_t7[f"B{row}"] = row_data.get("Mã NV", f"N{1000+idx}")
-        ws_t7[f"C{row}"] = row_data.get("Họ và tên", "")
+        ws_t7[f"B{row}"] = row_data.get("Mã NV", row_data.get("ma_cb", f"N{1000+idx}"))
+        ws_t7[f"C{row}"] = row_data.get("Họ và tên", row_data.get("ho_ten", ""))
 
         for day in range(1, 31):
             col_let = get_column_letter(3 + day)
@@ -203,7 +202,7 @@ def generate_attendance_excel(df_employees, unit_name="Phòng Công nghệ thôn
 
     ws_t7.column_dimensions['A'].width = 5
     ws_t7.column_dimensions['B'].width = 10
-    ws_t7.column_dimensions['C'].width = 25  # Căn chỉnh 25pt chuẩn
+    ws_t7.column_dimensions['C'].width = 25  # Độ rộng 25pt cho Họ và tên
     for day in range(1, 31):
         ws_t7.column_dimensions[get_column_letter(3 + day)].width = 3.5
     ws_t7.column_dimensions['AH'].width = 14
@@ -214,233 +213,143 @@ def generate_attendance_excel(df_employees, unit_name="Phòng Công nghệ thôn
     return output
 
 
-# ==============================================================================
-# GIAO DIỆN CHÍNH STREAMLIT
-# ==============================================================================
-st.title("📋 Quản lý Chấm công & Ngày nghỉ - BV Bưu Điện")
+def render_quan_ly_cham_cong(df_cb=None):
+    """
+    Hàm giao diện Quản lý Chấm công & Ngày nghỉ được gọi từ app.py
+    """
+    st.title("📋 Quản lý Chấm công & Ngày nghỉ")
 
-# Sidebar điều hướng
-menu = st.sidebar.radio(
-    "📌 Phân hệ chức năng",
-    [
-        "1. Chấm công & Xuất file Đơn vị",
-        "2. Đăng ký & Duyệt nghỉ phép/Nghỉ bù",
-        "3. Upload & Tổng hợp File Đơn vị",
-        "4. Quy định Ký hiệu & Công thức",
-        "5. Báo cáo & Thống kê Tổng hợp"
-    ]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.info("💡 **Hệ thống Quản trị Nhân sự v2.5**\nĐã tối ưu giao diện & công thức chấm công.")
-
-# ------------------------------------------------------------------------------
-# 1. CHẤM CÔNG VÀ XUẤT FILE TỪNG ĐƠN VỊ
-# ------------------------------------------------------------------------------
-if menu == "1. Chấm công & Xuất file Đơn vị":
-    st.header("📅 Quản lý Chấm công & Xuất File theo Đơn vị")
-    
-    col_sel1, col_sel2, col_sel3 = st.columns([2, 2, 3])
-    with col_sel1:
-        thang = st.selectbox("Tháng chấm công", list(range(1, 13)), index=8)
-    with col_sel2:
-        nam = st.selectbox("Năm", [2024, 2025, 2026], index=2)
-    with col_sel3:
-        don_vi = st.selectbox("Chọn Khoa / Phòng / Trung tâm", [
-            "Phòng Công nghệ thông tin",
-            "Khoa Ngoại tổng hợp",
-            "Khoa Khám bệnh",
-            "Trung tâm Y lao động"
-        ])
+    menu = st.radio(
+        "📌 Chọn chức năng quản lý",
+        [
+            "1. Chấm công & Xuất file Đơn vị",
+            "2. Đăng ký & Duyệt nghỉ phép/Nghỉ bù",
+            "3. Upload & Tổng hợp File Đơn vị",
+            "4. Quy định Ký hiệu & Công thức",
+            "5. Báo cáo & Thống kê"
+        ],
+        horizontal=True
+    )
 
     st.markdown("---")
 
-    # Giả lập danh sách nhân viên lọc sạch
-    data_demo = [
-        {"Mã NV": "N1108", "Họ và tên": "Mai Tuấn Linh", "Chức danh": "Kỹ sư CNTT"},
-        {"Mã NV": "N1109", "Họ và tên": "Hoàng Tuấn Anh", "Chức danh": "Chuyên viên"},
-        {"Mã NV": "N1090", "Họ và tên": "Phạm Văn Hiếu", "Chức danh": "Kỹ sư"},
-        {"Mã NV": "N1092", "Họ và tên": "Nguyễn Quang Trung", "Chức danh": "Trưởng phòng"},
-        {"Mã NV": "N1095", "Họ và tên": "Vũ Thị Hoa", "Chức danh": "Phó phòng"},
-    ]
-    df_grid = pd.DataFrame(data_demo)
-    
-    sundays = [6, 13, 20, 27]
-    for day in range(1, 31):
-        df_grid[f"{day:02d}"] = "x" if day not in sundays else ""
+    # Chuẩn hóa dữ liệu cán bộ đầu vào
+    if df_cb is not None and isinstance(df_cb, pd.DataFrame) and not df_cb.empty:
+        df_clean = pd.DataFrame()
+        df_clean["Mã NV"] = df_cb["ma_cb"] if "ma_cb" in df_cb.columns else df_cb.get("Mã NV", "")
+        df_clean["Họ và tên"] = df_cb["ho_ten"] if "ho_ten" in df_cb.columns else df_cb.get("Họ và tên", "")
+        df_clean["Chức danh"] = df_cb["chuc_danh"] if "chuc_danh" in df_cb.columns else df_cb.get("Chức danh", "Cán bộ")
+    else:
+        df_clean = pd.DataFrame([
+            {"Mã NV": "N1108", "Họ và tên": "Mai Tuấn Linh", "Chức danh": "Kỹ sư CNTT"},
+            {"Mã NV": "N1109", "Họ và tên": "Hoàng Tuấn Anh", "Chức danh": "Chuyên viên"},
+            {"Mã NV": "N1090", "Họ và tên": "Phạm Văn Hiếu", "Chức danh": "Kỹ sư"},
+            {"Mã NV": "N1092", "Họ và tên": "Nguyễn Quang Trung", "Chức danh": "Trưởng phòng"},
+        ])
 
-    st.subheader(f"Bảng chấm công chi tiết - {don_vi} (Tháng {thang:02d}/{nam})")
-    
-    # Grid chỉnh sửa công
-    edited_df = st.data_editor(
-        df_grid,
-        use_container_width=True,
-        height=350,
-        num_rows="fixed"
-    )
+    # 1. CHẤM CÔNG VÀ XUẤT FILE TỪNG ĐƠN VỊ
+    if menu == "1. Chấm công & Xuất file Đơn vị":
+        col_sel1, col_sel2, col_sel3 = st.columns([2, 2, 3])
+        with col_sel1:
+            thang = st.selectbox("Tháng chấm công", list(range(1, 13)), index=8)
+        with col_sel2:
+            nam = st.selectbox("Năm", [2024, 2025, 2026], index=2)
+        with col_sel3:
+            don_vi = st.selectbox("Chọn Khoa / Phòng / Trung tâm", [
+                "Phòng Công nghệ thông tin",
+                "Khoa Ngoại tổng hợp",
+                "Khoa Khám bệnh",
+                "Trung tâm Y lao động"
+            ])
 
-    c_btn1, c_btn2 = st.columns([2, 8])
-    with c_btn1:
-        if st.button("💾 Lưu dữ liệu chấm công", type="primary", use_container_width=True):
-            st.success("Đã lưu dữ liệu thành công!")
-            
-    with c_btn2:
-        excel_file = generate_attendance_excel(edited_df, unit_name=don_vi, month=thang, year=nam)
-        st.download_button(
-            label=f"📥 Tải File Excel Chấm Công chuẩn ({don_vi})",
-            data=excel_file,
-            file_name=f"Bang_Cham_Cong_{don_vi.replace(' ', '_')}_T{thang:02d}_{nam}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
+        st.write("")
+        df_grid = df_clean.copy()
+        sundays = [6, 13, 20, 27]
+        for day in range(1, 31):
+            df_grid[f"{day:02d}"] = "x" if day not in sundays else ""
+
+        st.subheader(f"Bảng chấm công chi tiết - {don_vi} (Tháng {thang:02d}/{nam})")
+        
+        edited_df = st.data_editor(
+            df_grid,
+            use_container_width=True,
+            height=380,
+            num_rows="fixed"
         )
 
-# ------------------------------------------------------------------------------
-# 2. KHAI BÁO & DUYỆT NGHỈ PHÉP / NGHỈ BÙ
-# ------------------------------------------------------------------------------
-elif menu == "2. Đăng ký & Duyệt nghỉ phép/Nghỉ bù":
-    st.header("📝 Đăng ký & Duyệt Đơn Xin Nghỉ")
-    
-    t1, t2 = st.tabs(["📝 Tạo đơn xin nghỉ mới", "📊 Danh sách & Phê duyệt đơn"])
-    
-    with t1:
-        st.subheader("Tạo đơn xin nghỉ bù / nghỉ phép / công tác")
-        with st.form("form_nghi"):
-            col1, col2 = st.columns(2)
-            with col1:
-                ma_nv = st.text_input("Mã nhân viên", value="N1108")
-                ho_ten = st.text_input("Họ và tên", value="Mai Tuấn Linh")
-                loai_nghi = st.selectbox("Loại ngày nghỉ", ["Nghỉ phép (P)", "Nghỉ bù (NB)", "Nghỉ ốm (Om)", "Nghỉ thai sản (TS)", "Đi công tác (CT)"])
-            with col2:
-                tu_ngay = st.date_input("Từ ngày")
-                den_ngay = st.date_input("Đến ngày")
-                ly_do = st.text_area("Lý do nghỉ", placeholder="Nhập chi tiết lý do xin nghỉ...")
-            
-            submit = st.form_submit_button("📩 Gửi đơn xin phê duyệt", type="primary")
-            if submit:
-                st.success("Đơn xin nghỉ đã được gửi tới Lãnh đạo đơn vị phê duyệt!")
-
-    with t2:
-        st.subheader("Danh sách đơn xin nghỉ chờ duyệt")
-        requests_data = pd.DataFrame([
-            {"Mã NV": "N1108", "Họ tên": "Mai Tuấn Linh", "Loại nghỉ": "Nghỉ bù", "Từ ngày": "2026-09-10", "Đến ngày": "2026-09-11", "Số ngày": 2, "Trạng thái": "Chờ duyệt"},
-            {"Mã NV": "N1090", "Họ tên": "Phạm Văn Hiếu", "Loại nghỉ": "Nghỉ phép", "Từ ngày": "2026-09-15", "Đến ngày": "2026-09-15", "Số ngày": 1, "Trạng thái": "Đã duyệt"},
-            {"Mã NV": "N1095", "Họ tên": "Vũ Thị Hoa", "Loại nghỉ": "Công tác", "Từ ngày": "2026-09-20", "Đến ngày": "2026-09-22", "Số ngày": 3, "Trạng thái": "Chờ duyệt"},
-        ])
-        st.dataframe(requests_data, use_container_width=True)
-
-# ------------------------------------------------------------------------------
-# 3. UPLOAD VÀ TỔNG HỢP BẢNG CHẤM CÔNG FILE EXCEL CỦA CÁC ĐƠN VỊ
-# ------------------------------------------------------------------------------
-elif menu == "3. Upload & Tổng hợp File Đơn vị":
-    st.header("📤 Upload & Tổng hợp Bảng chấm công toàn Bệnh viện")
-    st.info("Chức năng cho phép Phòng Tổ chức Cán bộ tải lên nhiều file Excel chấm công từ các đơn vị để tổng hợp tự động.")
-
-    uploaded_files = st.file_uploader(
-        "Kéo thả hoặc chọn các file Excel chấm công (.xlsx) của các Đơn vị",
-        type=["xlsx"],
-        accept_multiple_files=True
-    )
-
-    if uploaded_files:
-        st.success(f"Đã nhận {len(uploaded_files)} file Excel. Đang tiến hành đọc và tổng hợp...")
-        
-        summary_list = []
-        for file in uploaded_files:
-            try:
-                # Đọc dữ liệu từ file Excel
-                df_upload = pd.read_excel(file, sheet_name="NHÂN VIÊN", skiprows=3)
-                don_vi_name = file.name.split(".")[0].replace("Bang_Cham_Cong_", "")
+        c_btn1, c_btn2 = st.columns([2, 8])
+        with c_btn1:
+            if st.button("💾 Lưu dữ liệu chấm công", type="primary", use_container_width=True):
+                st.success("Đã lưu dữ liệu thành công!")
                 
-                num_staff = len(df_upload.dropna(subset=[df_upload.columns[1]]))
-                summary_list.append({
-                    "Tên File": file.name,
-                    "Đơn vị / Khoa Phòng": don_vi_name,
-                    "Số lượng CBNV": num_staff,
-                    "Trạng thái": "✅ Hợp lệ"
-                })
-            except Exception as e:
-                summary_list.append({
-                    "Tên File": file.name,
-                    "Đơn vị / Khoa Phòng": "Không xác định",
-                    "Số lượng CBNV": 0,
-                    "Trạng thái": f"❌ Lỗi định dạng ({str(e)})"
-                })
+        with c_btn2:
+            excel_file = generate_attendance_excel(edited_df, unit_name=don_vi, month=thang, year=nam)
+            st.download_button(
+                label=f"📥 Tải File Excel Chấm Công chuẩn ({don_vi})",
+                data=excel_file,
+                file_name=f"Bang_Cham_Cong_{don_vi.replace(' ', '_')}_T{thang:02d}_{nam}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
 
-        st.subheader("Kết quả đọc File các đơn vị")
-        st.table(pd.DataFrame(summary_list))
+    # 2. KHAI BÁO & DUYỆT NGHỈ PHÉP
+    elif menu == "2. Đăng ký & Duyệt nghỉ phép/Nghỉ bù":
+        t1, t2 = st.tabs(["📝 Tạo đơn xin nghỉ mới", "📊 Danh sách & Phê duyệt đơn"])
+        with t1:
+            with st.form("form_nghi"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.text_input("Mã nhân viên", value="N1108")
+                    st.text_input("Họ và tên", value="Mai Tuấn Linh")
+                    st.selectbox("Loại ngày nghỉ", ["Nghỉ phép (P)", "Nghỉ bù (NB)", "Nghỉ ốm (Om)", "Nghỉ thai sản (TS)", "Đi công tác (CT)"])
+                with col2:
+                    st.date_input("Từ ngày")
+                    st.date_input("Đến ngày")
+                    st.text_area("Lý do nghỉ", placeholder="Nhập chi tiết lý do xin nghỉ...")
+                
+                if st.form_submit_button("📩 Gửi đơn xin phê duyệt", type="primary"):
+                    st.success("Đơn xin nghỉ đã được gửi tới Lãnh đạo đơn vị phê duyệt!")
 
-        if st.button("⚡ Tiến hành Tổng hợp công Toàn Bệnh viện", type="primary"):
-            st.balloons()
-            st.success("Đã tổng hợp thành công công lao động toàn bệnh viện Tháng 09/2026!")
+        with t2:
+            st.dataframe(pd.DataFrame([
+                {"Mã NV": "N1108", "Họ tên": "Mai Tuấn Linh", "Loại nghỉ": "Nghỉ bù", "Từ ngày": "2026-09-10", "Đến ngày": "2026-09-11", "Trạng thái": "Chờ duyệt"},
+                {"Mã NV": "N1090", "Họ tên": "Phạm Văn Hiếu", "Loại nghỉ": "Nghỉ phép", "Từ ngày": "2026-09-15", "Đến ngày": "2026-09-15", "Trạng thái": "Đã duyệt"},
+            ]), use_container_width=True)
 
-# ------------------------------------------------------------------------------
-# 4. QUY ĐỊNH KÝ HIỆU VÀ CÔNG THỨC TỔNG HỢP
-# ------------------------------------------------------------------------------
-elif menu == "4. Quy định Ký hiệu & Công thức":
-    st.header("⚙️ Quy định Ký hiệu Chấm công & Công thức Tổng hợp")
-    
-    col_k1, col_k2 = st.columns(2)
-    
-    with col_k1:
-        st.subheader("📌 Danh mục Ký hiệu Chấm công")
-        ky_hieu_df = pd.DataFrame([
-            {"Ký hiệu": "x", "Tên quy đổi": "Làm ngày hành chính", "Hệ số công": "1.0"},
-            {"Ký hiệu": "xx", "Tên quy đổi": "Làm 2 ca / Làm tăng cường", "Hệ số công": "2.0"},
-            {"Ký hiệu": "T7", "Tên quy đổi": "Làm ngày Thứ 7", "Hệ số công": "1.0 / 1.5"},
-            {"Ký hiệu": "CN", "Tên quy đổi": "Làm ngày Chủ nhật", "Hệ số công": "2.0"},
-            {"Ký hiệu": "P", "Tên quy đổi": "Nghỉ phép hưởng lương", "Hệ số công": "1.0"},
-            {"Ký hiệu": "Om", "Tên quy đổi": "Nghỉ ốm (BHXH trả)", "Hệ số công": "0.0"},
-            {"Ký hiệu": "TS", "Tên quy đổi": "Nghỉ thai sản", "Hệ số công": "0.0"},
-            {"Ký hiệu": "NB", "Tên quy đổi": "Nghỉ bù", "Hệ số công": "0.0"},
-            {"Ký hiệu": "CT", "Tên quy đổi": "Đi công tác", "Hệ số công": "1.0"},
-        ])
-        st.table(ky_hieu_df)
+    # 3. UPLOAD VÀ TỔNG HỢP EXCEL
+    elif menu == "3. Upload & Tổng hợp File Đơn vị":
+        st.subheader("📤 Upload & Tổng hợp Bảng chấm công toàn Bệnh viện")
+        uploaded_files = st.file_uploader("Chọn các file Excel chấm công (.xlsx) của các Đơn vị", type=["xlsx"], accept_multiple_files=True)
 
-    with col_k2:
-        st.subheader("🧮 Công thức Tổng hợp Ngày công Excel")
-        st.markdown("""
-        * **Tổng ngày Hành chính (Cột AH):**
-          `=COUNTIF(D[Row]:AG[Row], "x") + COUNTIF(D[Row]:AG[Row], "xx")*2`
-        
-        * **Tổng ngày Làm Thứ 7 (Cột AI):**
-          `='LÀM THỨ 7'!AH[Row]`
-        
-        * **Tổng ngày Nghỉ phép (Cột AR):**
-          `=COUNTIF(D[Row]:AG[Row], "P")`
-          
-        * **Công thức sheet LÀM THỨ 7:**
-          Lấy dữ liệu tự động từ sheet NHÂN VIÊN sang sheet LÀM THỨ 7 bằng công thức `='NHÂN VIÊN'!{Cột}{Dòng}` cho các ngày Thứ 7 trong tháng.
-        """)
+        if uploaded_files:
+            st.success(f"Đã tiếp nhận {len(uploaded_files)} file Excel.")
+            if st.button("⚡ Tiến hành Tổng hợp công Toàn Bệnh viện", type="primary"):
+                st.balloons()
+                st.success("Tổng hợp công toàn bệnh viện thành công!")
 
-# ------------------------------------------------------------------------------
-# 5. BÁO CÁO & THỐNG KÊ TỔNG HỢP
-# ------------------------------------------------------------------------------
-elif menu == "5. Báo cáo & Thống kê Tổng hợp":
-    st.header("📊 Báo cáo & Thống kê Chấm công Toàn Bệnh viện")
-    
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("👥 Tổng CBNV toàn viện", "1,250 người", "+12 so với tháng trước")
-    m2.metric("🟢 Tỷ lệ đi làm bình quân", "96.8%", "+0.5%")
-    m3.metric("🏖️ Tổng số ngày nghỉ phép", "142 ngày")
-    m4.metric("⏰ Tổng giờ làm T7/Trực", "1,850 giờ")
+    # 4. QUY ĐỊNH KÝ HIỆU & CÔNG THỨC
+    elif menu == "4. Quy định Ký hiệu & Công thức":
+        col_k1, col_k2 = st.columns(2)
+        with col_k1:
+            st.subheader("📌 Danh mục Ký hiệu Chấm công")
+            st.table(pd.DataFrame([
+                {"Ký hiệu": "x", "Nội dung": "Làm ngày hành chính", "Hệ số": "1.0"},
+                {"Ký hiệu": "xx", "Nội dung": "Làm 2 ca / Làm tăng cường", "Hệ số": "2.0"},
+                {"Ký hiệu": "P", "Nội dung": "Nghỉ phép hưởng lương", "Hệ số": "1.0"},
+                {"Ký hiệu": "Om", "Nội dung": "Nghỉ ốm (BHXH trả)", "Hệ số": "0.0"},
+                {"Ký hiệu": "CT", "Nội dung": "Đi công tác", "Hệ số": "1.0"},
+            ]))
+        with col_k2:
+            st.subheader("🧮 Công thức Tổng hợp Ngày công")
+            st.markdown("""
+            * **Hành chính (AH):** `=COUNTIF(D5:AG5, "x") + COUNTIF(D5:AG5, "xx")*2`
+            * **Làm T7 (AI):** `='LÀM THỨ 7'!AH5`
+            * **Nghỉ phép (AR):** `=COUNTIF(D5:AG5, "P")`
+            """)
 
-    st.markdown("---")
-    
-    col_g1, col_g2 = st.columns(2)
-    with col_g1:
-        st.subheader("Tỷ lệ các loại ngày công trong tháng")
-        chart_data = pd.DataFrame({
-            "Loại công": ["Hành chính", "Làm T7", "Nghỉ phép", "Nghỉ ốm/TS", "Công tác"],
-            "Số lượng": [22000, 3200, 450, 120, 300]
-        })
-        fig = px.pie(chart_data, values="Số lượng", names="Loại công", hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col_g2:
-        st.subheader("So sánh ngày công giữa các Đơn vị")
-        unit_chart = pd.DataFrame({
-            "Đơn vị": ["Khoa Khám bệnh", "Khoa Ngoại", "Phòng CNTT", "TT Y lao động"],
-            "Công trung bình": [22.5, 23.1, 22.0, 21.8]
-        })
-        fig_bar = px.bar(unit_chart, x="Đơn vị", y="Công trung bình", color="Đơn vị", text_auto=True)
-        st.plotly_chart(fig_bar, use_container_width=True)
+    # 5. BÁO CÁO THỐNG KÊ
+    elif menu == "5. Báo cáo & Thống kê":
+        m1, m2, m3 = st.columns(3)
+        m1.metric("👥 Tổng CBNV", "1,250 người")
+        m2.metric("🟢 Tỷ lệ đi làm", "96.8%")
+        m3.metric("🏖️ Lượt nghỉ phép", "142 lượt")
