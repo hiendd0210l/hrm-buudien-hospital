@@ -363,3 +363,154 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     output = io.BytesIO()
     wb.save(output)
     return output.getvalue()
+
+
+# =====================================================================
+# 3. HÀM SẮP XẾP DANH SÁCH "ĐƠN VỊ XUẤT DỮ LIỆU"
+# =====================================================================
+def get_ordered_phong_ban_list(df_cb):
+    list_phong, list_khoa, list_trung_tam = [], [], []
+    
+    if isinstance(df_cb, pd.DataFrame) and not df_cb.empty and "khoa_phong" in df_cb.columns:
+        unique_kp = [str(kp).strip() for kp in df_cb["khoa_phong"].dropna().unique() if str(kp).strip()]
+        for kp in unique_kp:
+            kp_lower = kp.lower()
+            if "phòng" in kp_lower or "phong" in kp_lower:
+                list_phong.append(kp)
+            elif "trung tâm" in kp_lower or "trung tam" in kp_lower:
+                list_trung_tam.append(kp)
+            else:
+                list_khoa.append(kp)
+
+    if not list_phong and not list_khoa and not list_trung_tam:
+        list_phong = ["Phòng Kế hoạch Tổng hợp", "Phòng Tài chính Kế toán", "Phòng Nhân Sự - Tổng Hợp", "Phòng Tổ chức Cán bộ"]
+        list_khoa = ["Khoa Cấp cứu", "Khoa Khám bệnh", "Khoa Ngoại tổng hợp", "Khoa Nội tổng hợp"]
+        list_trung_tam = ["Trung tâm Đột quỵ", "Trung tâm Y học hạt nhân"]
+
+    list_phong.sort(key=lambda x: x.lower())
+    list_khoa.sort(key=lambda x: x.lower())
+    list_trung_tam.sort(key=lambda x: x.lower())
+
+    return ["Tất cả khoa/phòng/trung tâm"] + list_phong + list_khoa + list_trung_tam
+
+
+# =====================================================================
+# 4. GIAO DIỆN STREAMLIT DASHBOARD (HÀM ĐƯỢC IMPORT BỞI APP.PY)
+# =====================================================================
+def render_quan_ly_cham_cong(df_cb=None):
+    st.title("📋 Quản lý & Xuất Bảng Chấm Công Bệnh Viện")
+
+    if df_cb is None:
+        df_cb = st.session_state.get("df_can_bo", pd.DataFrame())
+
+    danh_sach_don_vi = get_ordered_phong_ban_list(df_cb)
+
+    # 1. Cấu hình thông số
+    st.subheader("⚙️ Cấu hình thông số xuất file")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        month = st.number_input("Tháng chấm công", min_value=1, max_value=12, value=datetime.now().month)
+    with col2:
+        year = st.number_input("Năm chấm công", min_value=2020, max_value=2030, value=datetime.now().year)
+    with col3:
+        don_vi_selected = st.selectbox("Đơn vị xuất dữ liệu", options=danh_sach_don_vi)
+
+    st.markdown("---")
+
+    # 2. Hiển thị Metrics
+    num_days = calendar.monthrange(year, month)[1]
+    
+    total_nv = 0
+    if isinstance(df_cb, pd.DataFrame) and not df_cb.empty and "khoa_phong" in df_cb.columns:
+        if don_vi_selected == "Tất cả khoa/phòng/trung tâm":
+            total_nv = len(df_cb)
+        else:
+            total_nv = len(df_cb[df_cb["khoa_phong"] == don_vi_selected])
+    else:
+        total_nv = 5
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Tổng cán bộ / Nhân viên", f"{total_nv} người")
+    m2.metric("Số ngày trong tháng", f"{num_days} ngày")
+    m3.metric("Tháng / Năm áp dụng", f"T{month:02d}/{year}")
+
+    excel_data = generate_excel_mau_cham_cong(month, year, don_vi_selected, df_cb)
+
+    # 3. Khu vực Xuất File Excel
+    st.write("### 📥 Tải xuống Bảng chấm công Excel")
+    file_name_clean = don_vi_selected.replace("Tất cả khoa/phòng/trung tâm", "Tat_Ca_Khoa_Phong").replace(" ", "_").replace("/", "_")
+    target_file_name = f"Bang_Cham_Cong_{file_name_clean}_T{month:02d}_{year}.xlsx"
+
+    col_btn1, col_btn2 = st.columns([2, 3])
+    with col_btn1:
+        if st.button("🚀 Khởi tạo & Tạo File Excel", type="primary", use_container_width=True):
+            st.session_state["cham_cong_excel_bytes"] = excel_data
+            st.session_state["cham_cong_file_name"] = target_file_name
+            st.success("Tạo file chấm công thành công!")
+
+    with col_btn2:
+        download_bytes = st.session_state.get("cham_cong_excel_bytes", excel_data)
+        download_name = st.session_state.get("cham_cong_file_name", target_file_name)
+        
+        st.download_button(
+            label="Tải xuống file Excel (.xlsx)",
+            data=download_bytes,
+            file_name=download_name,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+
+    # 4. Hiển thị Bảng tổng hợp
+    st.markdown("---")
+    st.subheader(f"📊 Bảng tổng hợp bình bầu xếp loại lao động toàn Bệnh viện (Tháng {month:02d}/{year})")
+    
+    if isinstance(df_cb, pd.DataFrame) and not df_cb.empty:
+        df_abc = df_cb.copy()
+        if don_vi_selected != "Tất cả khoa/phòng/trung tâm" and "khoa_phong" in df_abc.columns:
+            df_abc = df_abc[df_abc["khoa_phong"] == don_vi_selected]
+    else:
+        df_abc = pd.DataFrame([
+            {"ma_can_bo": "N0883", "ho_ten": "Vũ Hồng Vân", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự"},
+            {"ma_can_bo": "N0901", "ho_ten": "Phạm Thị Quý Nhi", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự"},
+            {"ma_can_bo": "N0872", "ho_ten": "Lê Hà Minh", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự"},
+            {"ma_can_bo": "N0648", "ho_ten": "Đỗ Thị Mai Quyên", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Nhân sự"},
+            {"ma_can_bo": "N0591", "ho_ten": "Phạm Thị Thanh Hương", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Nhân sự"}
+        ])
+
+    records = []
+    for idx, row in df_abc.reset_index(drop=True).iterrows():
+        records.append({
+            "STT": idx + 1,
+            "Mã NV": row.get("ma_can_bo", f"NV{idx+1:03d}"),
+            "Họ và tên": row.get("ho_ten", ""),
+            "Chức vụ": row.get("chuc_vu", "Nhân viên"),
+            "Đơn vị / Khoa phòng": row.get("khoa_phong", "Phòng Nhân sự"),
+            "Hành chính": 22.0,
+            "Làm T7": 0.0,
+            "Làm CN": 0.0,
+            "Làm Lễ": 0.0,
+            "Trực thường": 0,
+            "Trực T7": 1,
+            "Trực CN": 1,
+            "Trực Lễ": 0,
+            "Đã nghỉ bù": 0,
+            "Nghỉ phép (P/PP)": 0.0,
+            "Thai sản (TS)": 0,
+            "Nghỉ ốm (Ô/ÔÔ)": 0,
+            "Công tác (C/CC)": 0,
+            "Đi học (H/HH)": 0,
+            "Xếp loại": "A",
+            "Tồn bù còn lại": 0
+        })
+
+    df_summary = pd.DataFrame(records)
+    
+    st.dataframe(
+        df_summary, 
+        use_container_width=True, 
+        hide_index=True
+    )
+
+if __name__ == "__main__":
+    st.set_page_config(page_title="Chấm công Bệnh viện", layout="wide")
+    render_quan_ly_cham_cong()
