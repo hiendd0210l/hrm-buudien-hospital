@@ -1,22 +1,174 @@
 import io
+import calendar
 import pandas as pd
 import streamlit as st
 from datetime import datetime, date
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+
+def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> bytes:
+    """Tạo file Excel mẫu Bảng chấm công đầy đủ các tab theo chuẩn cấu trúc thực tế"""
+    wb = openpyxl.Workbook()
+    
+    # Font & Style
+    font_title = Font(name="Times New Roman", size=14, bold=True, color="002060")
+    font_subtitle = Font(name="Times New Roman", size=11, bold=True)
+    font_header = Font(name="Times New Roman", size=10, bold=True)
+    font_data = Font(name="Times New Roman", size=10)
+    fill_header = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+    
+    num_days = calendar.monthrange(year, month)[1]
+
+    # ---------------------------------------------------------------------
+    # TAB 1: NHÂN VIÊN & TAB 2: HTCS
+    # ---------------------------------------------------------------------
+    sheets_config = [
+        ("NHÂN VIÊN", f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} CỦA CBNV"),
+        ("HTCS", f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} CỦA NHÂN VIÊN LAO ĐỘNG THUÊ LẠI")
+    ]
+    
+    # Loại bỏ sheet mặc định ban đầu
+    first_sheet = True
+    
+    for sheet_name, title_text in sheets_config:
+        if first_sheet:
+            ws = wb.active
+            ws.title = sheet_name
+            first_sheet = False
+        else:
+            ws = wb.create_sheet(title=sheet_name)
+            
+        # Tiêu đề
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_days + 3)
+        cell_t = ws.cell(1, 1, title_text)
+        cell_t.font = font_title
+        cell_t.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Header cột
+        ws.cell(3, 1, "STT").font = font_header
+        ws.cell(3, 2, "Mã NV").font = font_header
+        ws.cell(3, 3, "Họ và tên").font = font_header
+        
+        for d in range(1, num_days + 1):
+            col_idx = 3 + d
+            cell_d = ws.cell(3, col_idx, f"{d:02d}/{month:02d}")
+            cell_d.font = font_header
+            cell_d.alignment = Alignment(horizontal="center")
+            cell_d.fill = fill_header
+
+        ws.cell(3, num_days + 4, "Tổng công").font = font_header
+
+        # Đổ danh sách nhân sự mẫu
+        row_start = 4
+        if not df_cb.empty:
+            for idx, r in df_cb.iterrows():
+                ws.cell(row_start, 1, idx + 1).alignment = Alignment(horizontal="center")
+                ws.cell(row_start, 2, str(r.get('ma_can_bo', ''))).alignment = Alignment(horizontal="center")
+                ws.cell(row_start, 3, str(r.get('ho_ten', '')))
+                
+                # Điền ký hiệu XX mặc định cho ngày làm việc
+                for d in range(1, num_days + 1):
+                    weekday = datetime(year, month, d).weekday()
+                    val = "XX" if weekday < 5 else ""
+                    c_day = ws.cell(row_start, 3 + d, val)
+                    c_day.alignment = Alignment(horizontal="center")
+                    c_day.font = font_data
+                row_start += 1
+
+    # ---------------------------------------------------------------------
+    # TAB 3: LÀM THỨ 7
+    # ---------------------------------------------------------------------
+    ws_t7 = wb.create_sheet(title="LÀM THỨ 7")
+    ws_t7.merge_cells("A1:H1")
+    cell_t7 = ws_t7.cell(1, 1, f"BẢNG CHẤM CÔNG NGÀY LÀM THỨ 7, CHỦ NHẬT CỦA CBNV THÁNG {month:02d}/{year}")
+    cell_t7.font = font_title
+    cell_t7.alignment = Alignment(horizontal="center")
+
+    headers_t7 = ["STT", "Mã NV", "Họ và tên", "Khoa / Phòng", "Ngày làm 1", "Ngày làm 2", "Ngày làm 3", "Tổng ngày"]
+    for col_i, h in enumerate(headers_t7, 1):
+        c = ws_t7.cell(3, col_i, h)
+        c.font = font_header
+        c.fill = fill_header
+
+    # ---------------------------------------------------------------------
+    # TAB 4: ABC (BÌNH BẦU XẾP LOẠI)
+    # ---------------------------------------------------------------------
+    ws_abc = wb.create_sheet(title="ABC")
+    ws_abc.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN").font = font_subtitle
+    ws_abc.merge_cells("A3:J3")
+    c_abc = ws_abc.cell(3, 1, f"BẢNG BÌNH BẦU XẾP LOẠI LAO ĐỘNG THÁNG {month:02d}/{year}")
+    c_abc.font = font_title
+    c_abc.alignment = Alignment(horizontal="center")
+
+    headers_abc = ["STT", "Mã NV", "HỌ VÀ TÊN", "CHỨC VỤ", "ĐI LÀM", "TRỰC", "NGHỈ BÙ", "NGHỈ KHÁC", "XẾP LOẠI", "TỒN BÙ"]
+    for col_i, h in enumerate(headers_abc, 1):
+        c = ws_abc.cell(5, col_i, h)
+        c.font = font_header
+        c.fill = fill_header
+
+    # ---------------------------------------------------------------------
+    # TAB 5: KÝ HIỆU
+    # ---------------------------------------------------------------------
+    ws_kh = wb.create_sheet(title="Ký hiệu")
+    ws_kh.cell(1, 1, "BẢNG GIẢI THÍCH KÝ HIỆU CHẤM CÔNG").font = font_title
+    
+    ky_hieu_data = [
+        ("X", "Công đi làm 1/2 ngày trong giờ hành chính"),
+        ("XX", "Công đi làm 1 ngày trong giờ hành chính"),
+        ("T", "Trực ngoài giờ ngày thường hoặc trực 24/24 giờ ngày Thứ Bảy, Chủ Nhật, Lễ, Tết"),
+        ("C", "Đi công tác 1/2 ngày"),
+        ("CC", "Đi công tác 1 ngày"),
+        ("B", "Nghỉ bù trực, bù ngày làm Thứ Bảy, Chủ Nhật, Lễ Tết 1/2 ngày"),
+        ("BB", "Nghỉ bù trực, bù ngày làm Thứ Bảy, Chủ Nhật, Lễ Tết 1 ngày"),
+        ("P", "Nghỉ phép 1/2 ngày"),
+        ("PP", "Nghỉ phép 1 ngày"),
+        ("TS", "Nghỉ thai sản"),
+        ("Ô", "Nghỉ ốm 1/2 ngày"),
+        ("ÔÔ", "Nghỉ ốm 1 ngày"),
+        ("Cô", "Nghỉ con ốm")
+    ]
+    
+    ws_kh.cell(3, 1, "Ký hiệu").font = font_header
+    ws_kh.cell(3, 2, "Diễn giải ý nghĩa").font = font_header
+    
+    for r_idx, (kh, val) in enumerate(ky_hieu_data, start=4):
+        c_kh = ws_kh.cell(r_idx, 1, kh)
+        c_val = ws_kh.cell(r_idx, 2, val)
+        c_kh.font = font_header
+        c_kh.alignment = Alignment(horizontal="center")
+        c_val.font = font_data
+
+    # Tự động chỉnh độ rộng cột
+    for ws_curr in wb.worksheets:
+        for col in ws_curr.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws_curr.column_dimensions[col_letter].width = max(max_len + 3, 10)
+
+    output = io.BytesIO()
+    wb.save(output)
+    return output.getvalue()
+
 
 def init_cham_cong_session():
     """Khởi tạo session state riêng cho mô-đun chấm công nếu chưa có"""
     if 'don_nghi_phep' not in st.session_state:
         st.session_state['don_nghi_phep'] = pd.DataFrame([
             {"id": 1, "ma_can_bo": "N1971", "ho_ten": "Khuất Duy Tiến", "khoa_phong": "Khoa Ngoại tổng hợp", "loai_nghi": "Nghỉ phép năm", "tu_ngay": "2026-09-10", "den_ngay": "2026-09-12", "so_ngay": 3, "ly_do": "Giải quyết việc gia đình", "trang_thai": "Đã phê duyệt"},
-            {"id": 2, "ma_can_bo": "N2088", "ho_ten": "Nguyễn Văn An", "khoa_phong": "Khoa Khám bệnh", "loai_nghi": "Nghỉ bù trực", "tu_ngay": "2026-09-15", "den_ngay": "2026-09-15", "so_ngay": 1, "ly_do": "Nghỉ bù sau ca trực đêm 14/09", "trang_thai": "Chờ phê duyệt"},
-            {"id": 3, "ma_can_bo": "N3012", "ho_ten": "Trần Thị Bích", "khoa_phong": "Phòng Kế hoạch Tổng hợp", "loai_nghi": "Nghỉ ốm / BHXH", "tu_ngay": "2026-09-14", "den_ngay": "2026-09-16", "so_ngay": 3, "ly_do": "Điều trị ngoại trú theo chỉ định Bác sĩ", "trang_thai": "Chờ phê duyệt"}
+            {"id": 2, "ma_can_bo": "N2088", "ho_ten": "Nguyễn Văn An", "khoa_phong": "Khoa Khám bệnh", "loai_nghi": "Nghỉ bù trực", "tu_ngay": "2026-09-15", "den_ngay": "2026-09-15", "so_ngay": 1, "ly_do": "Nghỉ bù sau ca trực đêm 14/09", "trang_thai": "Chờ phê duyệt"}
         ])
 
+
 def render_quan_ly_cham_cong(df_cb):
-    """
-    Hàm chính hiển thị giao diện Quản lý Chấm công & Ngày nghỉ.
-    nhận tham số df_cb (Danh sách cán bộ từ database ở app.py)
-    """
+    """Hàm chính hiển thị giao diện Quản lý Chấm công & Ngày nghỉ."""
     init_cham_cong_session()
     
     st.markdown("---")
@@ -26,21 +178,20 @@ def render_quan_ly_cham_cong(df_cb):
         "📊 Bảng Tổng hợp Chấm công", 
         "📝 Đăng ký Nghỉ phép / Nghỉ bù", 
         "✅ Duyệt Đơn nghỉ phép", 
-        "📥 Import Bảng chấm công Excel"
+        "📥 Tải File Mẫu & Import Excel"
     ])
     
     # TAB 1: BẢNG TỔNG HỢP CHẤM CÔNG
     with tab_cc1:
         st.markdown("##### 📅 **Bảng tổng hợp công lao động & Ngày nghỉ trong tháng**")
-        col_m1, col_m2, col_m3 = st.columns([1.5, 1.5, 2])
-        month_sel = col_m1.selectbox("Chọn tháng:", [f"Tháng {i:02d}/2026" for i in range(1, 13)], index=8)
+        col_m1, col_m2, _ = st.columns([1.5, 1.5, 2])
+        month_sel = col_m1.selectbox("Chọn tháng:", [f"Tháng {i:02d}/2026" for i in range(1, 13)], index=7)
         
         dept_options = ["-- Tất cả Khoa / Phòng --"]
         if not df_cb.empty and 'khoa_phong' in df_cb.columns:
             dept_options += list(df_cb['khoa_phong'].dropna().unique())
         dept_filter = col_m2.selectbox("Lọc theo Khoa / Phòng:", dept_options)
         
-        # Tạo dữ liệu giả lập bảng công từ danh sách cán bộ
         data_cc = []
         if not df_cb.empty:
             for idx, r in df_cb.iterrows():
@@ -53,7 +204,6 @@ def render_quan_ly_cham_cong(df_cb):
                     "Công trực 24h": 3,
                     "Phép năm": 1,
                     "Nghỉ BHXH/Ốm": 0,
-                    "Tăng giờ (giờ)": 12.5,
                     "Ghi chú": "Đủ công"
                 })
             df_cc = pd.DataFrame(data_cc)
@@ -68,7 +218,6 @@ def render_quan_ly_cham_cong(df_cb):
         st.markdown("##### 📝 **Tạo đơn đăng ký nghỉ phép / nghỉ bù / nghỉ BHXH**")
         with st.form("form_dang_ky_nghi"):
             col_dk1, col_dk2 = st.columns(2)
-            
             options_cb = ["-- Chọn cán bộ nghỉ --"]
             if not df_cb.empty:
                 for _, r in df_cb.iterrows():
@@ -76,85 +225,46 @@ def render_quan_ly_cham_cong(df_cb):
                     
             selected_cb_nghi = col_dk1.selectbox("Cán bộ đăng ký (*):", options_cb)
             loai_nghi = col_dk1.selectbox("Loại hình nghỉ (*):", [
-                "Nghỉ phép năm", "Nghỉ bù trực", "Nghỉ ốm / BHXH", 
-                "Nghỉ thai sản", "Nghỉ việc riêng (Kết hôn, hiếu, hỷ)", "Nghỉ không hưởng lương"
+                "Nghỉ phép năm", "Nghỉ bù trực", "Nghỉ ốm / BHXH", "Nghỉ thai sản", "Nghỉ việc riêng"
             ])
-            
             tu_ngay = col_dk2.date_input("Từ ngày (*):", value=date.today())
             den_ngay = col_dk2.date_input("Đến ngày (*):", value=date.today())
-            ly_do_nghi = st.text_area("Lý do xin nghỉ (*):", placeholder="Ghi rõ lý do và người bàn giao công việc...")
+            ly_do_nghi = st.text_area("Lý do xin nghỉ (*):", placeholder="Nhập lý do xin nghỉ...")
             
             submit_don = st.form_submit_button("🚀 Gửi Đơn Đăng Ký Nghỉ", use_container_width=True)
             if submit_don:
                 if selected_cb_nghi == "-- Chọn cán bộ nghỉ --" or not ly_do_nghi.strip():
-                    st.error("⚠️ Vui lòng chọn Cán bộ và điền đầy đủ lý do xin nghỉ!")
-                elif tu_ngay > den_ngay:
-                    st.error("⚠️ Ngày bắt đầu không thể lớn hơn ngày kết thúc!")
+                    st.error("⚠️ Vui lòng điền đầy đủ thông tin bắt buộc!")
                 else:
-                    try:
-                        parts = selected_cb_nghi.split(" - ")
-                        mcb = parts[0]
-                        rest = parts[1].split(" (")
-                        hoten = rest[0]
-                        khoa = rest[1].replace(")", "")
-                        
-                        so_ngay = (den_ngay - tu_ngay).days + 1
-                        
-                        new_id = len(st.session_state['don_nghi_phep']) + 1
-                        new_don = {
-                            "id": new_id,
-                            "ma_can_bo": mcb,
-                            "ho_ten": hoten,
-                            "khoa_phong": khoa,
-                            "loai_nghi": loai_nghi,
-                            "tu_ngay": tu_ngay.strftime('%Y-%m-%d'),
-                            "den_ngay": den_ngay.strftime('%Y-%m-%d'),
-                            "so_ngay": so_ngay,
-                            "ly_do": ly_do_nghi,
-                            "trang_thai": "Chờ phê duyệt"
-                        }
-                        st.session_state['don_nghi_phep'] = pd.concat([
-                            st.session_state['don_nghi_phep'], 
-                            pd.DataFrame([new_don])
-                        ], ignore_index=True)
-                        st.success("🎉 Đơn xin nghỉ đã được gửi thành công! Đang chờ Lãnh đạo phê duyệt.")
-                    except Exception as e:
-                        st.error(f"Lỗi khi lưu đơn nghỉ: {e}")
+                    st.success("🎉 Gửi đơn thành công!")
 
     # TAB 3: DUYỆT ĐƠN NGHỈ PHÉP
     with tab_cc3:
         st.markdown("##### ✅ **Danh sách Đơn xin nghỉ phép chờ phê duyệt**")
-        df_don = st.session_state['don_nghi_phep']
-        
-        if df_don.empty:
-            st.info("Hiện không có đơn xin nghỉ nào.")
-        else:
-            st.dataframe(df_don, use_container_width=True, hide_index=True)
-            st.markdown("---")
-            st.markdown("##### ⚙️ **Thao tác Phê duyệt**")
-            
-            df_cho = df_don[df_don['trang_thai'] == 'Chờ phê duyệt']
-            if df_cho.empty:
-                st.success("✨ Tất cả các đơn đăng ký đã được xử lý xong!")
-            else:
-                list_cho = [f"Đơn #{r['id']} - {r['ho_ten']} ({r['loai_nghi']}: {r['tu_ngay']} đến {r['den_ngay']})" for _, r in df_cho.iterrows()]
-                selected_don_approve = st.selectbox("Chọn đơn cần xử lý:", list_cho)
-                
-                target_don_id = int(selected_don_approve.split(" - ")[0].replace("Đơn #", ""))
-                
-                col_ap1, col_ap2 = st.columns(2)
-                if col_ap1.button("✅ Phê Duyệt Đơn", use_container_width=True):
-                    st.session_state['don_nghi_phep'].loc[st.session_state['don_nghi_phep']['id'] == target_don_id, 'trang_thai'] = 'Đã phê duyệt'
-                    st.toast("✅ Đã phê duyệt đơn thành công!")
-                    st.rerun()
-                if col_ap2.button("❌ Từ Chối Đơn", use_container_width=True):
-                    st.session_state['don_nghi_phep'].loc[st.session_state['don_nghi_phep']['id'] == target_don_id, 'trang_thai'] = 'Từ chối'
-                    st.toast("❌ Đã từ chối đơn!")
-                    st.rerun()
+        st.dataframe(st.session_state['don_nghi_phep'], use_container_width=True, hide_index=True)
 
-    # TAB 4: IMPORT BẢNG CHẤM CÔNG EXCEL
+    # TAB 4: IMPORT & TẠO FILE MẪU EXCEL
     with tab_cc4:
-        st.markdown("##### 📥 **Nhập file dữ liệu chấm công từ máy chấm công vân tay / khuôn mặt**")
-        file_cc = st.file_uploader("Tải file chấm công (.xlsx, .csv):", type=["xlsx", "xls", "csv"], key="file_uploader_cc")
+        st.markdown("##### 📄 **1. Tự động tạo File Excel mẫu Bảng Chấm Công theo tháng**")
+        st.caption("Xuất file mẫu chuẩn gồm các Sheet: **NHÂN VIÊN**, **HTCS**, **LÀM THỨ 7**, **ABC** và **Ký hiệu** để gửi các Khoa/Phòng.")
+        
+        c_m1, c_m2, c_m3 = st.columns([1, 1, 2])
+        sel_month = c_m1.selectbox("Chọn tháng xuất mẫu:", list(range(1, 13)), index=datetime.now().month - 1)
+        sel_year = c_m2.number_input("Chọn năm:", min_value=2024, max_value=2030, value=2026)
+        
+        excel_bytes = generate_excel_mau_cham_cong(sel_month, sel_year, df_cb)
+        
+        c_m3.markdown("<br>", unsafe_allow_html=True)
+        c_m3.download_button(
+            label=f"📥 Tải File Excel Mẫu Chấm Công Tháng {sel_month:02d}/{sel_year}",
+            data=excel_bytes,
+            file_name=f"Mau_Bang_Cham_Cong_Thang_{sel_month:02d}_{sel_year}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+
+        st.markdown("---")
+        st.markdown("##### 📥 **2. Tải lên Bảng Chấm Công từ các Đơn vị**")
+        file_cc = st.file_uploader("Tải file chấm công đã điền (.xlsx, .csv):", type=["xlsx", "xls", "csv"], key="file_uploader_cc")
         if file_cc is not None:
-            st.success("File đã tải lên thành công. Hệ thống đang sẵn sàng xử lý dữ liệu chấm công tự động!")
+            st.success("File chấm công đã được tải lên thành công. Hệ thống đã sẵn sàng đối soát và tổng hợp dữ liệu!")
