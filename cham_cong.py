@@ -7,10 +7,10 @@ import io
 
 def generate_attendance_excel(df_employees, month=9, year=2026):
     """
-    Hàm tạo file Excel chấm công hoàn chỉnh với đầy đủ quy tắc:
+    Hàm tạo file Excel chấm công hoàn chỉnh:
     - Xóa cột 'Tồn bù'
-    - Căn chỉnh độ rộng cột Họ và tên sheet LÀM THỨ 7
-    - Đồng bộ công thức ngày Thứ 7, CN, Lễ sang sheet LÀM THỨ 7 và tổng hợp riêng
+    - Căn chỉnh độ rộng cột Họ và tên sheet LÀM THỨ 7 (25pt)
+    - Đồng bộ công thức ngày Thứ 7, CN, Lễ sang sheet LÀM THỨ 7
     """
     wb = openpyxl.Workbook()
     
@@ -99,11 +99,16 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
 
     # Ghi dữ liệu nhân viên
     start_row = 5
-    for idx, row_data in df_employees.iterrows():
+    for idx, row_data in df_employees.reset_index(drop=True).iterrows():
         row = start_row + idx
         ws_main[f"A{row}"] = idx + 1
-        ws_main[f"B{row}"] = row_data.get("Mã NV", f"N{1000+idx}")
-        ws_main[f"C{row}"] = row_data.get("Họ và tên", "")
+        
+        # Nhận linh hoạt tên cột Mã NV và Họ tên từ df_cb
+        ma_nv = row_data.get("Mã NV", row_data.get("ma_nv", row_data.get("Mã cán bộ", f"N{1000+idx}")))
+        ho_ten = row_data.get("Họ và tên", row_data.get("ho_ten", row_data.get("Họ tên", "")))
+        
+        ws_main[f"B{row}"] = ma_nv
+        ws_main[f"C{row}"] = ho_ten
 
         for day in range(1, 31):
             col_let = get_column_letter(3 + day)
@@ -174,11 +179,15 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
     for day in saturdays:
         ws_t7[f"{get_column_letter(3 + day)}4"].fill = WEEKEND_FILL
 
-    for idx, row_data in df_employees.iterrows():
+    for idx, row_data in df_employees.reset_index(drop=True).iterrows():
         row = start_row + idx
         ws_t7[f"A{row}"] = idx + 1
-        ws_t7[f"B{row}"] = row_data.get("Mã NV", f"N{1000+idx}")
-        ws_t7[f"C{row}"] = row_data.get("Họ và tên", "")
+        
+        ma_nv = row_data.get("Mã NV", row_data.get("ma_nv", row_data.get("Mã cán bộ", f"N{1000+idx}")))
+        ho_ten = row_data.get("Họ và tên", row_data.get("ho_ten", row_data.get("Họ tên", "")))
+
+        ws_t7[f"B{row}"] = ma_nv
+        ws_t7[f"C{row}"] = ho_ten
 
         for day in range(1, 31):
             col_let = get_column_letter(3 + day)
@@ -203,47 +212,52 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
 
     ws_t7.column_dimensions['A'].width = 5
     ws_t7.column_dimensions['B'].width = 10
-    ws_t7.column_dimensions['C'].width = 25  # Căn chỉnh rộng phù hợp cho Họ và tên
+    ws_t7.column_dimensions['C'].width = 25  # Độ rộng 25pt cho Họ và tên
     
     for day in range(1, 31):
         ws_t7.column_dimensions[get_column_letter(3 + day)].width = 3.5
     ws_t7.column_dimensions['AH'].width = 14
 
-    # Xuất ra Buffer
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
     return output
 
-def render_quan_ly_cham_cong():
-    st.title("📋 Quản lý chấm công - Bệnh viện Bưu điện")
-    st.write("Phòng Công nghệ thông tin")
 
-    # Mẫu danh sách nhân viên mặc định
-    default_data = [
-        {"Mã NV": "N1108", "Họ và tên": "Mai Tuấn Linh"},
-        {"Mã NV": "N1109", "Họ và tên": "Hoàng Tuấn Anh"},
-        {"Mã NV": "N1090", "Họ và tên": "Phạm Văn Hiếu"},
-        {"Mã NV": "N0875", "Họ và tên": "Phạm Diệu Linh"},
-        {"Mã NV": "N1034", "Họ và tên": "Vũ Đức Chính"},
-        {"Mã NV": "N0855", "Họ và tên": "Nguyễn Văn Tiềm"},
-        {"Mã NV": "N0564", "Họ và tên": "Nguyễn Đức Phương"},
-        {"Mã NV": "N0456", "Họ và tên": "Ngô Đức Hinh"},
-        {"Mã NV": "N0451", "Họ và tên": "Nguyễn Cảnh Việt"},
-        {"Mã NV": "N0223", "Họ và tên": "Nguyễn Vũ Ngọc Ánh"},
-        {"Mã NV": "N0380", "Họ và tên": "Nguyễn Minh Hải"},
-    ]
-    
-    df_employees = pd.DataFrame(default_data)
+def render_quan_ly_cham_cong(df_cb=None):
+    """
+    Hàm hiển thị giao diện Streamlit, nhận tham số df_cb truyền từ app.py
+    """
+    st.title("📋 Quản lý chấm công & Ngày nghỉ")
+    st.write("Bệnh viện Bưu điện - Phòng Công nghệ thông tin")
 
-    st.subheader("Bảng nhân viên")
+    # Mẫu danh sách nhân viên mặc định nếu df_cb truyền vào bị trống
+    if df_cb is None or (isinstance(df_cb, pd.DataFrame) and df_cb.empty):
+        default_data = [
+            {"Mã NV": "N1108", "Họ và tên": "Mai Tuấn Linh"},
+            {"Mã NV": "N1109", "Họ và tên": "Hoàng Tuấn Anh"},
+            {"Mã NV": "N1090", "Họ và tên": "Phạm Văn Hiếu"},
+            {"Mã NV": "N0875", "Họ và tên": "Phạm Diệu Linh"},
+            {"Mã NV": "N1034", "Họ và tên": "Vũ Đức Chính"},
+            {"Mã NV": "N0855", "Họ và tên": "Nguyễn Văn Tiềm"},
+            {"Mã NV": "N0564", "Họ và tên": "Nguyễn Đức Phương"},
+            {"Mã NV": "N0456", "Họ và tên": "Ngô Đức Hinh"},
+            {"Mã NV": "N0451", "Họ và tên": "Nguyễn Cảnh Việt"},
+            {"Mã NV": "N0223", "Họ và tên": "Nguyễn Vũ Ngọc Ánh"},
+            {"Mã NV": "N0380", "Họ và tên": "Nguyễn Minh Hải"},
+        ]
+        df_employees = pd.DataFrame(default_data)
+    else:
+        df_employees = df_cb.copy()
+
+    st.subheader("Danh sách cán bộ / nhân viên chấm công")
     st.dataframe(df_employees, use_container_width=True)
 
     # Nút Xuất File Excel
     excel_file = generate_attendance_excel(df_employees)
     
     st.download_button(
-        label="📥 Tải Bảng Chấm Công Excel (Đã cập nhật)",
+        label="📥 Tải Bảng Chấm Công Excel",
         data=excel_file,
         file_name="Bang_Cham_Cong_Thang_09_2026.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
