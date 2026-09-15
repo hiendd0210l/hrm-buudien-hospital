@@ -37,7 +37,7 @@ def set_style(cell, font=None, fill=None, alignment=None, border=None):
 # ---------------------------------------------------------------------
 # HÀM TẠO FILE EXCEL CHUẨN ĐÚNG NGUYÊN TẮC
 # ---------------------------------------------------------------------
-def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: pd.DataFrame) -> bytes:
+def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: pd.DataFrame = None) -> bytes:
     wb = openpyxl.Workbook()
     
     # Danh sách cán bộ mẫu nếu không truyền df_cb
@@ -65,7 +65,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     font_subtitle = Font(name="Arial", size=10, bold=True)
     font_header = Font(name="Arial", size=9, bold=True)
     font_data = Font(name="Arial", size=10)
-    font_bold = Font(name="Arial", size=10, bold=True)
     
     fill_header_default = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
     align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -91,7 +90,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         elif day_type == "HOLIDAY":
             hol_cols.append(col_letter)
 
-    # Hàm tạo công thức tính ngày công hỗ trợ cả chữ HOA và chữ thường (X/x = 0.5, XX/xx = 1.0)
     def build_work_formula(col_list, row_idx):
         if not col_list:
             return "0"
@@ -108,9 +106,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             parts.append(f'IF(OR({c}{row_idx}="T",{c}{row_idx}="t"),1,0)')
         return " + ".join(parts)
 
-    # =====================================================================
     # SHEET 1: NHÂN VIÊN
-    # =====================================================================
     ws_nv = wb.active
     ws_nv.title = "NHÂN VIÊN"
     
@@ -134,7 +130,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         day_fills[col_idx] = fill_color if fill_color else fill_header_default
 
     start_sum = 4 + num_days
-    # Cột tổng hợp phân tách riêng biệt
     headers_sum = [
         "Hành chính", "Làm Thứ 7", "Làm Chủ Nhật", "Làm Lễ/Tết", 
         "Trực Thứ 7", "Trực Chủ Nhật", "Trực Lễ/Tết", "Trực ngoài giờ",
@@ -151,7 +146,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             f_fill = day_fills[c] if (4 <= c <= 3 + num_days and r == 4) else fill_header_default
             set_style(cell, font=font_header, fill=f_fill, alignment=align_center)
 
-    # Đổ dữ liệu cán bộ & Công thức sheet NHÂN VIÊN
     for idx, nv in enumerate(nv_list, start=5):
         ws_nv.cell(idx, 1, idx - 4)
         ws_nv.cell(idx, 2, nv["ma_cb"])
@@ -160,7 +154,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         st_l = get_column_letter(4)
         en_l = get_column_letter(3 + num_days)
         
-        # Công thức tính chính xác theo yêu cầu
         ws_nv.cell(idx, start_sum, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"XX")+COUNTIF({st_l}{idx}:{en_l}{idx},"xx")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"X")+COUNTIF({st_l}{idx}:{en_l}{idx},"x"))*0.5')
         ws_nv.cell(idx, start_sum+1, f'={build_work_formula(sat_cols, idx)}')
         ws_nv.cell(idx, start_sum+2, f'={build_work_formula(sun_cols, idx)}')
@@ -171,7 +164,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         ws_nv.cell(idx, start_sum+7, f'=COUNTIF({st_l}{idx}:{en_l}{idx},"T") + COUNTIF({st_l}{idx}:{en_l}{idx},"t")')
         ws_nv.cell(idx, start_sum+8, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"BB")+COUNTIF({st_l}{idx}:{en_l}{idx},"bb")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"B")+COUNTIF({st_l}{idx}:{en_l}{idx},"b"))*0.5')
         
-        # Loại bỏ hoàn toàn số âm ở cột Nghỉ bù còn lại
         ton_col = get_column_letter(start_sum+14)
         da_nghi_col = get_column_letter(start_sum+8)
         ws_nv.cell(idx, start_sum+9, f'=MAX(0, {ton_col}{idx} - {da_nghi_col}{idx})')
@@ -188,9 +180,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             set_style(cell, font=font_data, fill=f_fill, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 4) else align_left
 
-    # =====================================================================
-    # SHEET 2: LÀM THỨ 7 (Tính X/x = 0.5 công, XX/xx = 1.0 công)
-    # =====================================================================
+    # SHEET 2: LÀM THỨ 7
     ws_t7 = wb.create_sheet(title="LÀM THỨ 7")
     ws_t7.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_t7.cell(1, 1), font=font_subtitle)
     ws_t7.cell(1, 4, f"BẢNG CHẤM CÔNG NGÀY LÀM THỨ 7, CHỦ NHẬT & NGÀY LỄ CỦA CBNV THÁNG {month:02d}/{year}")
@@ -224,7 +214,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         
         st_l = get_column_letter(4)
         en_l = get_column_letter(tot_col - 1)
-        # Sửa lại công thức tổng ngày công đúng quy tắc X = 0.5, XX = 1
         ws_t7.cell(idx, tot_col, f'=(COUNTIF({st_l}{idx}:{en_l}{idx},"XX")+COUNTIF({st_l}{idx}:{en_l}{idx},"xx")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"T")+COUNTIF({st_l}{idx}:{en_l}{idx},"t")) + (COUNTIF({st_l}{idx}:{en_l}{idx},"X")+COUNTIF({st_l}{idx}:{en_l}{idx},"x"))*0.5')
         
         for c_idx in range(1, tot_col + 1):
@@ -233,9 +222,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             set_style(cell, font=font_data, fill=fill_color, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 4) else align_left
 
-    # =====================================================================
-    # SHEET 3: ABC (TỔNG HỢP HIỂN THỊ ĐẦY ĐỦ CÁC CỘT THEO KÝ HIỆU)
-    # =====================================================================
+    # SHEET 3: ABC
     ws_abc = wb.create_sheet(title="ABC")
     ws_abc.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_abc.cell(1, 1), font=font_subtitle)
     ws_abc.cell(2, 1, f"Đơn vị: {phong_ban}"); set_style(ws_abc.cell(2, 1), font=font_subtitle)
@@ -259,24 +246,23 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         ws_abc.cell(idx, 3, nv["ho_ten"])
         ws_abc.cell(idx, 4, nv["chuc_vu"])
         
-        nv_row = idx - 1  # Dòng tương ứng bên sheet NHÂN VIÊN
-        ws_abc.cell(idx, 5, f"='NHÂN VIÊN'!{get_column_letter(start_sum)}{nv_row}")       # Đi làm
-        ws_abc.cell(idx, 6, f"='NHÂN VIÊN'!{get_column_letter(start_sum+7)}{nv_row}")     # Trực
-        ws_abc.cell(idx, 7, f"='NHÂN VIÊN'!{get_column_letter(start_sum+8)}{nv_row}")     # Nghỉ bù
-        ws_abc.cell(idx, 8, f"=(COUNTIF('NHÂN VIÊN'!D{nv_row}:AH{nv_row},\"PP\")+COUNTIF('NHÂN VIÊN'!D{nv_row}:AH{nv_row},\"pp\")) + (COUNTIF('NHÂN VIÊN'!D{nv_row}:AH{nv_row},\"P\")+COUNTIF('NHÂN VIÊN'!D{nv_row}:AH{nv_row},\"p\"))*0.5") # Nghỉ phép
-        ws_abc.cell(idx, 9, f"='NHÂN VIÊN'!{get_column_letter(start_sum+10)}{nv_row}")    # Thai sản
-        ws_abc.cell(idx, 10, f"='NHÂN VIÊN'!{get_column_letter(start_sum+12)}{nv_row}")   # Nghỉ ốm
-        ws_abc.cell(idx, 11, f"='NHÂN VIÊN'!{get_column_letter(start_sum+11)}{nv_row}")   # Công tác
-        ws_abc.cell(idx, 12, f"='NHÂN VIÊN'!{get_column_letter(start_sum+13)}{nv_row}")   # Đi học
-        ws_abc.cell(idx, 13, "A")                                                       # Xếp loại
-        ws_abc.cell(idx, 14, f"='NHÂN VIÊN'!{get_column_letter(start_sum+9)}{nv_row}")    # Tồn bù còn lại
+        nv_row = idx - 1
+        ws_abc.cell(idx, 5, f"='NHÂN VIÊN'!{get_column_letter(start_sum)}{nv_row}")
+        ws_abc.cell(idx, 6, f"='NHÂN VIÊN'!{get_column_letter(start_sum+7)}{nv_row}")
+        ws_abc.cell(idx, 7, f"='NHÂN VIÊN'!{get_column_letter(start_sum+8)}{nv_row}")
+        ws_abc.cell(idx, 8, f"=(COUNTIF('NHÂN VIÊN'!D{nv_row}:AH{nv_row},\"PP\")+COUNTIF('NHÂN VIÊN'!D{nv_row}:AH{nv_row},\"pp\")) + (COUNTIF('NHÂN VIÊN'!D{nv_row}:AH{nv_row},\"P\")+COUNTIF('NHÂN VIÊN'!D{nv_row}:AH{nv_row},\"p\"))*0.5")
+        ws_abc.cell(idx, 9, f"='NHÂN VIÊN'!{get_column_letter(start_sum+10)}{nv_row}")
+        ws_abc.cell(idx, 10, f"='NHÂN VIÊN'!{get_column_letter(start_sum+12)}{nv_row}")
+        ws_abc.cell(idx, 11, f"='NHÂN VIÊN'!{get_column_letter(start_sum+11)}{nv_row}")
+        ws_abc.cell(idx, 12, f"='NHÂN VIÊN'!{get_column_letter(start_sum+13)}{nv_row}")
+        ws_abc.cell(idx, 13, "A")
+        ws_abc.cell(idx, 14, f"='NHÂN VIÊN'!{get_column_letter(start_sum+9)}{nv_row}")
         
         for c_idx in range(1, 15):
             cell = ws_abc.cell(idx, c_idx)
             set_style(cell, font=font_data, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 5) else align_left
 
-    # Đảm bảo bật lưới hiển thị ô cho toàn bộ sheet
     for ws in wb.worksheets:
         ws.views.sheetView[0].showGridLines = True
         for col in ws.columns:
@@ -287,3 +273,34 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     output = io.BytesIO()
     wb.save(output)
     return output.getvalue()
+
+
+# ---------------------------------------------------------------------
+# HÀM HIỂN THỊ GIAO DIỆN STREAMLIT (TÍCH HỢP VÀO APP MAIN)
+# ---------------------------------------------------------------------
+def render_quan_ly_cham_cong():
+    st.title("📋 Quản lý & Xuất Bảng Chấm Công")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        month = st.number_input("Tháng", min_value=1, max_value=12, value=datetime.now().month)
+    with col2:
+        year = st.number_input("Năm", min_value=2020, max_value=2030, value=datetime.now().year)
+    with col3:
+        phong_ban = st.text_input("Khoa / Phòng ban", value="Khoa Khám bệnh")
+
+    st.markdown("---")
+    
+    df_cb = st.session_state.get("df_can_bo", None)
+    
+    if st.button("🚀 Tạo & Tải Mẫu Bảng Chấm Công Excel", type="primary"):
+        with st.spinner("Đang khởi tạo file Excel chuẩn..."):
+            excel_data = generate_excel_mau_cham_cong(month, year, phong_ban, df_cb)
+            
+            st.success("Tạo bảng chấm công thành công!")
+            st.download_button(
+                label="📥 Tải xuống file Excel (.xlsx)",
+                data=excel_data,
+                file_name=f"Bang_Cham_Cong_{phong_ban.replace(' ', '_')}_T{month:02d}_{year}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
