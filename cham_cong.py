@@ -77,7 +77,8 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
                     "ma_cb": str(row.get('ma_can_bo', '')),
                     "ho_ten": str(row.get('ho_ten', '')),
                     "chuc_vu": str(row.get('chuc_vu', 'Nhân viên')),
-                    "khoa_phong": str(row.get('khoa_phong', ''))
+                    "khoa_phong": str(row.get('khoa_phong', '')),
+                    "ton_bu_dau_ky": float(row.get('ton_bu_dau_ky', 0)) # Tồn bù lũy kế từ T1 đến trước tháng này
                 }
                 loai_hd = str(row.get('loai_hop_dong', '')).upper()
                 if 'HTCS' in loai_hd or 'THUÊ LẠI' in loai_hd or 'THUE LAI' in loai_hd:
@@ -87,14 +88,15 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
 
     if not nv_list and not htcs_list:
         nv_list = [
-            {"ma_cb": "N1096", "ho_ten": "Nguyễn Thị Thảo Nguyên", "chuc_vu": "Bác sĩ", "khoa_phong": "Khoa Khám bệnh"},
-            {"ma_cb": "N1048", "ho_ten": "Đỗ Thanh Mai", "chuc_vu": "Bác sĩ", "khoa_phong": "Khoa Khám bệnh"},
-            {"ma_cb": "N0668", "ho_ten": "Đào Tiến Luật", "chuc_vu": "Bác sĩ", "khoa_phong": "Khoa Khám bệnh"},
-            {"ma_cb": "N0418", "ho_ten": "Phạm Ngọc Mai", "chuc_vu": "Điều dưỡng", "khoa_phong": "Khoa Khám bệnh"}
+            {"ma_cb": "N0883", "ho_ten": "Vũ Hồng Vân", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự", "ton_bu_dau_ky": 0},
+            {"ma_cb": "N0901", "ho_ten": "Phạm Thị Quý Nhi", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự", "ton_bu_dau_ky": 0},
+            {"ma_cb": "N0872", "ho_ten": "Lê Hà Minh", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự", "ton_bu_dau_ky": 0},
+            {"ma_cb": "N0648", "ho_ten": "Đỗ Thị Mai Quyên", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Nhân sự", "ton_bu_dau_ky": 0},
+            {"ma_cb": "N0591", "ho_ten": "Phạm Thị Thanh Hương", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Nhân sự", "ton_bu_dau_ky": 0}
         ]
         htcs_list = [
-            {"ma_cb": "HT001", "ho_ten": "Nguyễn Văn Hỗ Trợ", "chuc_vu": "Lao động thuê lại", "khoa_phong": "Khoa Khám bệnh"},
-            {"ma_cb": "HT002", "ho_ten": "Trần Thị Chăm Sóc", "chuc_vu": "Lao động thuê lại", "khoa_phong": "Khoa Khám bệnh"}
+            {"ma_cb": "HT001", "ho_ten": "Nguyễn Văn Hỗ Trợ", "chuc_vu": "Lao động thuê lại", "khoa_phong": "Phòng Nhân sự", "ton_bu_dau_ky": 0},
+            {"ma_cb": "HT002", "ho_ten": "Trần Thị Chăm Sóc", "chuc_vu": "Lao động thuê lại", "khoa_phong": "Phòng Nhân sự", "ton_bu_dau_ky": 0}
         ]
 
     font_title = Font(name="Arial", size=12, bold=True, color="002060")
@@ -149,7 +151,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     def build_main_sheet(ws, title_sheet, data_list):
         ws.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws.cell(1, 1), font=font_subtitle)
         ws.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} ({title_sheet})")
-        ws.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 18)
+        ws.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 19)
         set_style(ws.cell(1, 4), font=font_title, alignment=align_center)
         ws.cell(2, 1, f"Đơn vị: {phong_ban}"); set_style(ws.cell(2, 1), font=font_subtitle)
         
@@ -167,10 +169,11 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             day_fills[col_idx] = fill_color if fill_color else fill_header_default
 
         start_sum = 4 + num_days
+        # Đã bổ sung thêm cột "Nghỉ phép"
         headers_sum = [
             "Hành chính", "Làm T7", "Làm CN", "Làm Lễ", 
             "Trực T7", "Trực CN", "Trực Lễ", "Trực ngày thường",
-            "Đã nghỉ bù", "Nghỉ bù còn", "Thai sản", "Công tác", "Nghỉ ốm", "Đi học", "Tồn bù"
+            "Đã nghỉ bù", "Nghỉ bù còn", "Nghỉ phép", "Thai sản", "Công tác", "Nghỉ ốm", "Đi học", "Tồn bù"
         ]
         for i, h in enumerate(headers_sum):
             c_idx = start_sum + i
@@ -190,40 +193,45 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             ws.cell(idx, 2, nv["ma_cb"])
             ws.cell(idx, 3, nv["ho_ten"])
             
-            # Cột 1..4: Ngày công
+            # 1..4: Ngày công
             ws.cell(idx, start_sum, f'={build_code_formula(workday_cols, idx, "x", "xx")}')
             ws.cell(idx, start_sum+1, f'={build_code_formula(sat_cols, idx, "x", "xx")}')
             ws.cell(idx, start_sum+2, f'={build_code_formula(sun_cols, idx, "x", "xx")}')
             ws.cell(idx, start_sum+3, f'={build_code_formula(hol_cols, idx, "x", "xx")}')
             
-            # Cột 5..8: Ngày trực
-            ws.cell(idx, start_sum+4, f'={build_duty_formula(sat_cols, idx)}')       # Trực T7 (E_truc)
-            ws.cell(idx, start_sum+5, f'={build_duty_formula(sun_cols, idx)}')       # Trực CN (F_truc)
-            ws.cell(idx, start_sum+6, f'={build_duty_formula(hol_cols, idx)}')       # Trực Lễ (G_truc)
-            ws.cell(idx, start_sum+7, f'={build_duty_formula(workday_cols, idx)}')   # Trực Thường (H_truc)
+            # 5..8: Ngày trực
+            ws.cell(idx, start_sum+4, f'={build_duty_formula(sat_cols, idx)}')       # Trực T7
+            ws.cell(idx, start_sum+5, f'={build_duty_formula(sun_cols, idx)}')       # Trực CN
+            ws.cell(idx, start_sum+6, f'={build_duty_formula(hol_cols, idx)}')       # Trực Lễ
+            ws.cell(idx, start_sum+7, f'={build_duty_formula(workday_cols, idx)}')   # Trực Thường
             
-            # Cột 9: Đã nghỉ bù (Ký hiệu 'b' hoặc 'bb')
+            # 9: Đã nghỉ bù (Ký hiệu 'b' hoặc 'bb')
             ws.cell(idx, start_sum+8, f'={build_code_formula(all_month_cols, idx, "b", "bb")}')
             
-            # Các cột lấy địa chỉ Excel để lập công thức Tồn bù & Nghỉ bù còn
+            # Lấy địa chỉ các cột để tạo công thức Tồn bù & Nghỉ bù còn
             c_truc_t7 = get_column_letter(start_sum+4)
             c_truc_cn = get_column_letter(start_sum+5)
             c_truc_le = get_column_letter(start_sum+6)
             c_truc_th = get_column_letter(start_sum+7)
             c_da_nghi = get_column_letter(start_sum+8)
-            c_ton_bu  = get_column_letter(start_sum+14)
+            c_ton_bu  = get_column_letter(start_sum+15) # Cột Tồn bù chuyển sang ví trí +15
 
-            # Cột 15: Tồn bù (Trực T7/CN/Thường = +1 ngày, Trực Lễ = +2 ngày)
-            ws.cell(idx, start_sum+14, f'=({c_truc_t7}{idx} + {c_truc_cn}{idx} + {c_truc_th}{idx})*1 + ({c_truc_le}{idx})*2')
+            ton_dau_ky = nv.get("ton_bu_dau_ky", 0)
 
-            # Cột 10: Nghỉ bù còn = Tồn bù - Đã nghỉ bù
+            # 16: Tồn bù = Tồn đầu kỳ (từ T1 đến nay) + (Trực T7/CN/Thường)*1 + (Trực Lễ)*2
+            ws.cell(idx, start_sum+15, f'={ton_dau_ky} + ({c_truc_t7}{idx} + {c_truc_cn}{idx} + {c_truc_th}{idx})*1 + ({c_truc_le}{idx})*2')
+
+            # 10: Nghỉ bù còn = Tồn bù - Đã nghỉ bù
             ws.cell(idx, start_sum+9, f'=MAX(0, {c_ton_bu}{idx} - {c_da_nghi}{idx})')
 
-            # Cột 11..14: Thai sản, Công tác, Nghỉ ốm, Đi học
-            ws.cell(idx, start_sum+10, f'={build_code_formula(all_month_cols, idx, "ts", "ts")}')
-            ws.cell(idx, start_sum+11, f'={build_code_formula(all_month_cols, idx, "c", "cc")}')
-            ws.cell(idx, start_sum+12, f'={build_code_formula(all_month_cols, idx, "ô", "ôô")}')
-            ws.cell(idx, start_sum+13, f'={build_code_formula(all_month_cols, idx, "h", "hh")}')
+            # 11: Nghỉ phép (Ký hiệu 'p' hoặc 'pp')
+            ws.cell(idx, start_sum+10, f'={build_code_formula(all_month_cols, idx, "p", "pp")}')
+
+            # 12..15: Thai sản, Công tác, Nghỉ ốm, Đi học
+            ws.cell(idx, start_sum+11, f'={build_code_formula(all_month_cols, idx, "ts", "ts")}')
+            ws.cell(idx, start_sum+12, f'={build_code_formula(all_month_cols, idx, "c", "cc")}')
+            ws.cell(idx, start_sum+13, f'={build_code_formula(all_month_cols, idx, "ô", "ôô")}')
+            ws.cell(idx, start_sum+14, f'={build_code_formula(all_month_cols, idx, "h", "hh")}')
 
             for c_idx in range(1, start_sum + len(headers_sum)):
                 cell = ws.cell(idx, c_idx)
@@ -241,7 +249,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     ws_htcs = wb.create_sheet(title="HTCS")
     build_main_sheet(ws_htcs, "LAO ĐỘNG THUÊ LẠI / HTCS", htcs_list)
 
-    # SHEET 3: LÀM THỨ 7 (Đã cập nhật phân loại Tổng T7/CN, Lễ/Tết & Tổng cộng)
+    # SHEET 3: LÀM THỨ 7
     ws_t7 = wb.create_sheet(title="LÀM THỨ 7")
     ws_t7.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_t7.cell(1, 1), font=font_subtitle)
     ws_t7.cell(1, 4, f"BẢNG CHẤM CÔNG NGÀY LÀM THỨ 7, CHỦ NHẬT & NGÀY LỄ THÁNG {month:02d}/{year}")
@@ -274,7 +282,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         c = ws_t7.cell(3, w_i, f"Ngày {d:02d}")
         set_style(c, font=font_header, fill=fill_color, alignment=align_center)
         
-    # Cột tổng hợp riêng biệt
     ws_t7.cell(3, c_tot_sat, "Tổng T7, CN")
     set_style(ws_t7.cell(3, c_tot_sat), font=font_header, fill=fill_header_default, alignment=align_center)
 
@@ -290,11 +297,9 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         ws_t7.cell(idx, 2, nv["ma_cb"])
         ws_t7.cell(idx, 3, nv["ho_ten"])
         
-        # 1. Tổng T7, CN
         ws_t7.cell(idx, c_tot_sat, f'={build_code_formula(wk_sat_sun_cols, idx, "x", "xx")} + {build_duty_formula(wk_sat_sun_cols, idx)}')
-        # 2. Tổng Lễ/Tết
         ws_t7.cell(idx, c_tot_hol, f'={build_code_formula(wk_holiday_cols, idx, "x", "xx")} + {build_duty_formula(wk_holiday_cols, idx)}')
-        # 3. Tổng cộng toàn bộ
+        
         c_sat_l = get_column_letter(c_tot_sat)
         c_hol_l = get_column_letter(c_tot_hol)
         ws_t7.cell(idx, c_tot_all, f'={c_sat_l}{idx} + {c_hol_l}{idx}')
@@ -327,8 +332,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         c = ws_abc.cell(5, col_i, h)
         set_style(c, font=font_header, fill=fill_header_default, alignment=align_center)
 
-    all_month_cols = [get_column_letter(3 + d) for d in range(1, num_days + 1)]
-
     for idx, nv in enumerate(nv_list, start=6):
         ws_abc.cell(idx, 1, idx - 5)
         ws_abc.cell(idx, 2, nv["ma_cb"])
@@ -346,18 +349,15 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         ws_abc.cell(idx, 11, f"='NHÂN VIÊN'!{get_column_letter(start_sum+5)}{nv_row}")
         ws_abc.cell(idx, 12, f"='NHÂN VIÊN'!{get_column_letter(start_sum+6)}{nv_row}")
         
-        ws_abc.cell(idx, 13, f"='NHÂN VIÊN'!{get_column_letter(start_sum+8)}{nv_row}")
-        
-        p_list = [f"'NHÂN VIÊN'!{c}" for c in all_month_cols]
-        ws_abc.cell(idx, 14, f"={build_code_formula(p_list, nv_row, 'p', 'pp')}")
-        
-        ws_abc.cell(idx, 15, f"='NHÂN VIÊN'!{get_column_letter(start_sum+10)}{nv_row}")
-        ws_abc.cell(idx, 16, f"='NHÂN VIÊN'!{get_column_letter(start_sum+12)}{nv_row}")
-        ws_abc.cell(idx, 17, f"='NHÂN VIÊN'!{get_column_letter(start_sum+11)}{nv_row}")
-        ws_abc.cell(idx, 18, f"='NHÂN VIÊN'!{get_column_letter(start_sum+13)}{nv_row}")
+        ws_abc.cell(idx, 13, f"='NHÂN VIÊN'!{get_column_letter(start_sum+8)}{nv_row}") # Đã nghỉ bù
+        ws_abc.cell(idx, 14, f"='NHÂN VIÊN'!{get_column_letter(start_sum+10)}{nv_row}") # Nghỉ phép
+        ws_abc.cell(idx, 15, f"='NHÂN VIÊN'!{get_column_letter(start_sum+11)}{nv_row}") # Thai sản
+        ws_abc.cell(idx, 16, f"='NHÂN VIÊN'!{get_column_letter(start_sum+13)}{nv_row}") # Nghỉ ốm
+        ws_abc.cell(idx, 17, f"='NHÂN VIÊN'!{get_column_letter(start_sum+12)}{nv_row}") # Công tác
+        ws_abc.cell(idx, 18, f"='NHÂN VIÊN'!{get_column_letter(start_sum+14)}{nv_row}") # Đi học
         
         ws_abc.cell(idx, 19, "A")
-        ws_abc.cell(idx, 20, f"='NHÂN VIÊN'!{get_column_letter(start_sum+9)}{nv_row}")
+        ws_abc.cell(idx, 20, f"='NHÂN VIÊN'!{get_column_letter(start_sum+9)}{nv_row}") # Nghỉ bù còn
         
         for c_idx in range(1, len(headers_abc) + 1):
             cell = ws_abc.cell(idx, c_idx)
@@ -391,7 +391,7 @@ def get_ordered_phong_ban_list(df_cb):
                 list_khoa.append(kp)
 
     if not list_phong and not list_khoa and not list_trung_tam:
-        list_phong = ["Phòng Kế hoạch Tổng hợp", "Phòng Tài chính Kế toán", "Phòng Tổ chức Cán bộ"]
+        list_phong = ["Phòng Kế hoạch Tổng hợp", "Phòng Tài chính Kế toán", "Phòng Nhân Sự - Tổng Hợp", "Phòng Tổ chức Cán bộ"]
         list_khoa = ["Khoa Cấp cứu", "Khoa Khám bệnh", "Khoa Ngoại tổng hợp", "Khoa Nội tổng hợp"]
         list_trung_tam = ["Trung tâm Đột quỵ", "Trung tâm Y học hạt nhân"]
 
@@ -435,7 +435,7 @@ def render_quan_ly_cham_cong(df_cb=None):
         else:
             total_nv = len(df_cb[df_cb["khoa_phong"] == don_vi_selected])
     else:
-        total_nv = 6
+        total_nv = 5
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Tổng cán bộ / Nhân viên", f"{total_nv} người")
@@ -478,11 +478,11 @@ def render_quan_ly_cham_cong(df_cb=None):
             df_abc = df_abc[df_abc["khoa_phong"] == don_vi_selected]
     else:
         df_abc = pd.DataFrame([
-            {"ma_can_bo": "N1096", "ho_ten": "Nguyễn Thị Thảo Nguyên", "chuc_vu": "Bác sĩ", "khoa_phong": "Khoa Khám bệnh"},
-            {"ma_can_bo": "N1048", "ho_ten": "Đỗ Thanh Mai", "chuc_vu": "Bác sĩ", "khoa_phong": "Khoa Khám bệnh"},
-            {"ma_can_bo": "N0668", "ho_ten": "Đào Tiến Luật", "chuc_vu": "Bác sĩ", "khoa_phong": "Khoa Khám bệnh"},
-            {"ma_can_bo": "N0418", "ho_ten": "Phạm Ngọc Mai", "chuc_vu": "Điều dưỡng", "khoa_phong": "Khoa Khám bệnh"},
-            {"ma_can_bo": "HT001", "ho_ten": "Nguyễn Văn Hỗ Trợ", "chuc_vu": "Lao động thuê lại", "khoa_phong": "Khoa Khám bệnh"}
+            {"ma_can_bo": "N0883", "ho_ten": "Vũ Hồng Vân", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự"},
+            {"ma_can_bo": "N0901", "ho_ten": "Phạm Thị Quý Nhi", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự"},
+            {"ma_can_bo": "N0872", "ho_ten": "Lê Hà Minh", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự"},
+            {"ma_can_bo": "N0648", "ho_ten": "Đỗ Thị Mai Quyên", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Nhân sự"},
+            {"ma_can_bo": "N0591", "ho_ten": "Phạm Thị Thanh Hương", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Nhân sự"}
         ])
 
     records = []
@@ -492,7 +492,7 @@ def render_quan_ly_cham_cong(df_cb=None):
             "Mã NV": row.get("ma_can_bo", f"NV{idx+1:03d}"),
             "Họ và tên": row.get("ho_ten", ""),
             "Chức vụ": row.get("chuc_vu", "Nhân viên"),
-            "Đơn vị / Khoa phòng": row.get("khoa_phong", "Khoa Khám bệnh"),
+            "Đơn vị / Khoa phòng": row.get("khoa_phong", "Phòng Nhân sự"),
             "Hành chính": 22.0,
             "Làm T7": 0.0,
             "Làm CN": 0.0,
@@ -502,7 +502,7 @@ def render_quan_ly_cham_cong(df_cb=None):
             "Trực CN": 1,
             "Trực Lễ": 0,
             "Đã nghỉ bù": 0,
-            "Nghỉ phép (P/PP)": 1.0,
+            "Nghỉ phép (P/PP)": 0.0,
             "Thai sản (TS)": 0,
             "Nghỉ ốm (Ô/ÔÔ)": 0,
             "Công tác (C/CC)": 0,
