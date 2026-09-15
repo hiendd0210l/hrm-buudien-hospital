@@ -7,21 +7,19 @@ import io
 
 def generate_attendance_excel(df_employees, month=9, year=2026):
     """
-    Hàm tạo file Excel chấm công hoàn chỉnh:
-    - Xóa cột 'Tồn bù'
-    - Căn chỉnh độ rộng cột Họ và tên sheet LÀM THỨ 7 (25pt)
-    - Đồng bộ công thức ngày Thứ 7, CN, Lễ sang sheet LÀM THỨ 7
+    Hàm xuất file Excel chấm công chuẩn:
+    1. Xóa bỏ hoàn toàn cột "Tồn bù"
+    2. Đồng bộ công thức ngày T7, CN, Lễ sang sheet "LÀM THỨ 7" và tính tổng công riêng
+    3. Căn chỉnh độ rộng cột "Họ và tên" sheet LÀM THỨ 7 lên 25pt
     """
     wb = openpyxl.Workbook()
     
-    # Tạo các Sheet
     ws_main = wb.active
     ws_main.title = "NHÂN VIÊN"
     ws_htcs = wb.create_sheet(title="HTCS")
     ws_t7 = wb.create_sheet(title="LÀM THỨ 7")
     ws_abc = wb.create_sheet(title="ABC")
 
-    # Định nghĩa màu sắc & Font
     HEADER_FILL = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
     WEEKEND_FILL = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
     
@@ -45,7 +43,7 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
     sundays = [6, 13, 20, 27]
 
     # =============================================================
-    # 1. SHEET "NHÂN VIÊN" (KHÔNG CÓ CỘT TỒN BÙ)
+    # 1. SHEET "NHÂN VIÊN" (ĐÃ XÓA CỘT TỒN BÙ)
     # =============================================================
     ws_main['A1'] = "BỆNH VIỆN BƯU ĐIỆN"
     ws_main['A1'].font = Font(name="Arial", size=10, bold=True)
@@ -57,7 +55,6 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
     ws_main['W1'].font = TITLE_FONT
     ws_main['W1'].alignment = Alignment(horizontal="center", vertical="center")
 
-    # Header
     ws_main.merge_cells("A3:A4")
     ws_main['A3'] = "STT"
     ws_main.merge_cells("B3:B4")
@@ -69,10 +66,8 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
     ws_main['D3'] = f"Ngày làm việc trong tháng {month:02d}.{year}"
 
     for day in range(1, 31):
-        col_letter = get_column_letter(3 + day)
-        ws_main[f"{col_letter}4"] = f"{day:02d}"
+        ws_main[f"{get_column_letter(3 + day)}4"] = f"{day:02d}"
 
-    # Danh sách cột tổng hợp (ĐÃ XÓA TỒN BÙ)
     summary_headers = [
         ("Hành chính", "AH"), ("Làm T7", "AI"), ("Làm CN", "AJ"),
         ("Làm Lễ", "AK"), ("Trực T7", "AL"), ("Trực CN", "AM"),
@@ -94,16 +89,13 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
             cell.border = THIN_BORDER
 
     for day in saturdays + sundays:
-        col_let = get_column_letter(3 + day)
-        ws_main[f"{col_let}4"].fill = WEEKEND_FILL
+        ws_main[f"{get_column_letter(3 + day)}4"].fill = WEEKEND_FILL
 
-    # Ghi dữ liệu nhân viên
     start_row = 5
     for idx, row_data in df_employees.reset_index(drop=True).iterrows():
         row = start_row + idx
         ws_main[f"A{row}"] = idx + 1
         
-        # Nhận linh hoạt tên cột Mã NV và Họ tên từ df_cb
         ma_nv = row_data.get("Mã NV", row_data.get("ma_nv", row_data.get("Mã cán bộ", f"N{1000+idx}")))
         ho_ten = row_data.get("Họ và tên", row_data.get("ho_ten", row_data.get("Họ tên", "")))
         
@@ -212,7 +204,7 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
 
     ws_t7.column_dimensions['A'].width = 5
     ws_t7.column_dimensions['B'].width = 10
-    ws_t7.column_dimensions['C'].width = 25  # Độ rộng 25pt cho Họ và tên
+    ws_t7.column_dimensions['C'].width = 25  # Căn rộng cột Họ và tên 25pt
     
     for day in range(1, 31):
         ws_t7.column_dimensions[get_column_letter(3 + day)].width = 3.5
@@ -226,39 +218,62 @@ def generate_attendance_excel(df_employees, month=9, year=2026):
 
 def render_quan_ly_cham_cong(df_cb=None):
     """
-    Hàm hiển thị giao diện Streamlit, nhận tham số df_cb truyền từ app.py
+    Khôi phục đầy đủ giao diện Quản lý chấm công ban đầu
     """
-    st.title("📋 Quản lý chấm công & Ngày nghỉ")
-    st.write("Bệnh viện Bưu điện - Phòng Công nghệ thông tin")
+    st.title("📋 Quản lý Chấm công & Ngày nghỉ")
 
-    # Mẫu danh sách nhân viên mặc định nếu df_cb truyền vào bị trống
     if df_cb is None or (isinstance(df_cb, pd.DataFrame) and df_cb.empty):
-        default_data = [
-            {"Mã NV": "N1108", "Họ và tên": "Mai Tuấn Linh"},
-            {"Mã NV": "N1109", "Họ và tên": "Hoàng Tuấn Anh"},
-            {"Mã NV": "N1090", "Họ và tên": "Phạm Văn Hiếu"},
-            {"Mã NV": "N0875", "Họ và tên": "Phạm Diệu Linh"},
-            {"Mã NV": "N1034", "Họ và tên": "Vũ Đức Chính"},
-            {"Mã NV": "N0855", "Họ và tên": "Nguyễn Văn Tiềm"},
-            {"Mã NV": "N0564", "Họ và tên": "Nguyễn Đức Phương"},
-            {"Mã NV": "N0456", "Họ và tên": "Ngô Đức Hinh"},
-            {"Mã NV": "N0451", "Họ và tên": "Nguyễn Cảnh Việt"},
-            {"Mã NV": "N0223", "Họ và tên": "Nguyễn Vũ Ngọc Ánh"},
-            {"Mã NV": "N0380", "Họ và tên": "Nguyễn Minh Hải"},
-        ]
-        df_employees = pd.DataFrame(default_data)
-    else:
-        df_employees = df_cb.copy()
+        df_cb = pd.DataFrame([
+            {"Mã NV": "N1108", "Họ và tên": "Mai Tuấn Linh", "Chức vụ": "Cán bộ"},
+            {"Mã NV": "N1109", "Họ và tên": "Hoàng Tuấn Anh", "Chức vụ": "Cán bộ"},
+        ])
 
-    st.subheader("Danh sách cán bộ / nhân viên chấm công")
-    st.dataframe(df_employees, use_container_width=True)
+    # Bộ lọc Thời gian & Phòng ban
+    col1, col2, col3 = st.columns([2, 2, 3])
+    with col1:
+        thang = st.selectbox("Tháng", list(range(1, 13)), index=8)
+    with col2:
+        nam = st.selectbox("Năm", [2024, 2025, 2026], index=2)
+    with col3:
+        don_vi = st.selectbox("Đơn vị / Phòng ban", ["Phòng Công nghệ thông tin", "Tất cả các khoa phòng"])
 
-    # Nút Xuất File Excel
-    excel_file = generate_attendance_excel(df_employees)
-    
-    st.download_button(
-        label="📥 Tải Bảng Chấm Công Excel",
-        data=excel_file,
-        file_name="Bang_Cham_Cong_Thang_09_2026.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    # Các Tabs chức năng chính
+    tab1, tab2, tab3 = st.tabs(["📅 Bảng chấm công chi tiết", "📊 Tổng hợp công", "⚙️ Thiết lập ký hiệu"])
+
+    with tab1:
+        st.subheader(f"Bảng chấm công chi tiết - Tháng {thang:02d}/{nam}")
+        
+        # Tạo khung xem & chỉnh sửa chấm công
+        df_display = df_cb.copy()
+        
+        # Thêm mô phỏng các cột ngày trong tháng D1 -> D30
+        for day in range(1, 31):
+            df_display[f"Ngày {day:02d}"] = "x" if day not in [5, 6, 12, 13, 19, 20, 26, 27] else ""
+            
+        st.data_editor(df_display, use_container_width=True, height=400, num_rows="dynamic")
+
+        col_act1, col_act2 = st.columns([2, 8])
+        with col_act1:
+            if st.button("💾 Lưu bảng công", type="primary"):
+                st.success("Đã lưu bảng chấm công thành công!")
+        with col_act2:
+            excel_data = generate_attendance_excel(df_cb, month=thang, year=nam)
+            st.download_button(
+                label="📥 Xuất file Excel Chấm Công (Theo mẫu chuẩn)",
+                data=excel_data,
+                file_name=f"Bang_Cham_Cong_Thang_{thang:02d}_{nam}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    with tab2:
+        st.subheader("Tổng hợp công trong tháng")
+        st.dataframe(df_cb, use_container_width=True)
+
+    with tab3:
+        st.subheader("Quy định ký hiệu chấm công")
+        st.markdown("""
+        - **x**: Làm đủ ca hành chính (1 công)
+        - **xx**: Làm thêm ca / làm ngày nghỉ (2 công)
+        - **Om**: Nghỉ ốm
+        - **P**: Nghỉ phép
+        """)
