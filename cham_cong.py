@@ -53,7 +53,7 @@ def set_optimal_column_widths(ws):
         elif ws.title == "ABC" and col_idx == 4: # Chức vụ
             ws.column_dimensions[col_letter].width = 18
         else:
-            ws.column_dimensions[col_letter].width = 6
+            ws.column_dimensions[col_letter].width = 7
 
 
 # =====================================================================
@@ -103,6 +103,8 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     font_data = Font(name="Arial", size=10)
     
     fill_header_default = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    fill_total = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    
     align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
     align_left = Alignment(horizontal="left", vertical="center")
     align_center_nowrap = Alignment(horizontal="center", vertical="center")
@@ -127,7 +129,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         elif day_type == "HOLIDAY":
             hol_cols.append(col_letter)
 
-    # Hàm tạo công thức tính công: 1 ký tự = 0.5, 2 ký tự = 1.0
     def build_code_formula(col_list, row_idx, single_code, double_code):
         if not col_list:
             return "0"
@@ -189,27 +190,40 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             ws.cell(idx, 2, nv["ma_cb"])
             ws.cell(idx, 3, nv["ho_ten"])
             
+            # Cột 1..4: Ngày công
             ws.cell(idx, start_sum, f'={build_code_formula(workday_cols, idx, "x", "xx")}')
             ws.cell(idx, start_sum+1, f'={build_code_formula(sat_cols, idx, "x", "xx")}')
             ws.cell(idx, start_sum+2, f'={build_code_formula(sun_cols, idx, "x", "xx")}')
             ws.cell(idx, start_sum+3, f'={build_code_formula(hol_cols, idx, "x", "xx")}')
             
-            ws.cell(idx, start_sum+4, f'={build_duty_formula(sat_cols, idx)}')
-            ws.cell(idx, start_sum+5, f'={build_duty_formula(sun_cols, idx)}')
-            ws.cell(idx, start_sum+6, f'={build_duty_formula(hol_cols, idx)}')
-            ws.cell(idx, start_sum+7, f'={build_duty_formula(workday_cols, idx)}')
+            # Cột 5..8: Ngày trực
+            ws.cell(idx, start_sum+4, f'={build_duty_formula(sat_cols, idx)}')       # Trực T7 (E_truc)
+            ws.cell(idx, start_sum+5, f'={build_duty_formula(sun_cols, idx)}')       # Trực CN (F_truc)
+            ws.cell(idx, start_sum+6, f'={build_duty_formula(hol_cols, idx)}')       # Trực Lễ (G_truc)
+            ws.cell(idx, start_sum+7, f'={build_duty_formula(workday_cols, idx)}')   # Trực Thường (H_truc)
             
+            # Cột 9: Đã nghỉ bù (Ký hiệu 'b' hoặc 'bb')
             ws.cell(idx, start_sum+8, f'={build_code_formula(all_month_cols, idx, "b", "bb")}')
             
-            ton_col = get_column_letter(start_sum+14)
-            da_nghi_col = get_column_letter(start_sum+8)
-            ws.cell(idx, start_sum+9, f'=MAX(0, {ton_col}{idx} - {da_nghi_col}{idx})')
-            
+            # Các cột lấy địa chỉ Excel để lập công thức Tồn bù & Nghỉ bù còn
+            c_truc_t7 = get_column_letter(start_sum+4)
+            c_truc_cn = get_column_letter(start_sum+5)
+            c_truc_le = get_column_letter(start_sum+6)
+            c_truc_th = get_column_letter(start_sum+7)
+            c_da_nghi = get_column_letter(start_sum+8)
+            c_ton_bu  = get_column_letter(start_sum+14)
+
+            # Cột 15: Tồn bù (Trực T7/CN/Thường = +1 ngày, Trực Lễ = +2 ngày)
+            ws.cell(idx, start_sum+14, f'=({c_truc_t7}{idx} + {c_truc_cn}{idx} + {c_truc_th}{idx})*1 + ({c_truc_le}{idx})*2')
+
+            # Cột 10: Nghỉ bù còn = Tồn bù - Đã nghỉ bù
+            ws.cell(idx, start_sum+9, f'=MAX(0, {c_ton_bu}{idx} - {c_da_nghi}{idx})')
+
+            # Cột 11..14: Thai sản, Công tác, Nghỉ ốm, Đi học
             ws.cell(idx, start_sum+10, f'={build_code_formula(all_month_cols, idx, "ts", "ts")}')
             ws.cell(idx, start_sum+11, f'={build_code_formula(all_month_cols, idx, "c", "cc")}')
             ws.cell(idx, start_sum+12, f'={build_code_formula(all_month_cols, idx, "ô", "ôô")}')
             ws.cell(idx, start_sum+13, f'={build_code_formula(all_month_cols, idx, "h", "hh")}')
-            ws.cell(idx, start_sum+14, 0)
 
             for c_idx in range(1, start_sum + len(headers_sum)):
                 cell = ws.cell(idx, c_idx)
@@ -227,19 +241,28 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     ws_htcs = wb.create_sheet(title="HTCS")
     build_main_sheet(ws_htcs, "LAO ĐỘNG THUÊ LẠI / HTCS", htcs_list)
 
-    # SHEET 3: LÀM THỨ 7
+    # SHEET 3: LÀM THỨ 7 (Đã cập nhật phân loại Tổng T7/CN, Lễ/Tết & Tổng cộng)
     ws_t7 = wb.create_sheet(title="LÀM THỨ 7")
     ws_t7.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_t7.cell(1, 1), font=font_subtitle)
     ws_t7.cell(1, 4, f"BẢNG CHẤM CÔNG NGÀY LÀM THỨ 7, CHỦ NHẬT & NGÀY LỄ THÁNG {month:02d}/{year}")
     
     weekend_days = []
+    wk_sat_sun_cols, wk_holiday_cols = [], []
     for d in range(1, num_days + 1):
         fill_color, day_type = get_day_type(d, month, year)
         if day_type in ["SAT", "SUN", "HOLIDAY"]:
-            weekend_days.append((d, fill_color))
+            col_letter = get_column_letter(4 + len(weekend_days))
+            weekend_days.append((d, fill_color, day_type))
+            if day_type in ["SAT", "SUN"]:
+                wk_sat_sun_cols.append(col_letter)
+            else:
+                wk_holiday_cols.append(col_letter)
             
-    tot_col = 4 + len(weekend_days)
-    ws_t7.merge_cells(start_row=1, start_column=4, end_row=1, end_column=tot_col)
+    c_tot_sat = 4 + len(weekend_days)
+    c_tot_hol = c_tot_sat + 1
+    c_tot_all = c_tot_sat + 2
+
+    ws_t7.merge_cells(start_row=1, start_column=4, end_row=1, end_column=c_tot_all)
     set_style(ws_t7.cell(1, 4), font=font_title, alignment=align_center)
     ws_t7.cell(2, 1, f"Đơn vị: {phong_ban}"); set_style(ws_t7.cell(2, 1), font=font_subtitle)
 
@@ -247,12 +270,19 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     ws_t7.cell(3, 2, "Mã NV"); set_style(ws_t7.cell(3, 2), font=font_header, fill=fill_header_default, alignment=align_center)
     ws_t7.cell(3, 3, "Họ và tên"); set_style(ws_t7.cell(3, 3), font=font_header, fill=fill_header_default, alignment=align_center)
 
-    for w_i, (d, fill_color) in enumerate(weekend_days, start=4):
+    for w_i, (d, fill_color, _) in enumerate(weekend_days, start=4):
         c = ws_t7.cell(3, w_i, f"Ngày {d:02d}")
         set_style(c, font=font_header, fill=fill_color, alignment=align_center)
         
-    ws_t7.cell(3, tot_col, "Tổng công")
-    set_style(ws_t7.cell(3, tot_col), font=font_header, fill=fill_header_default, alignment=align_center)
+    # Cột tổng hợp riêng biệt
+    ws_t7.cell(3, c_tot_sat, "Tổng T7, CN")
+    set_style(ws_t7.cell(3, c_tot_sat), font=font_header, fill=fill_header_default, alignment=align_center)
+
+    ws_t7.cell(3, c_tot_hol, "Tổng Lễ/Tết")
+    set_style(ws_t7.cell(3, c_tot_hol), font=font_header, fill=fill_header_default, alignment=align_center)
+
+    ws_t7.cell(3, c_tot_all, "Tổng cộng")
+    set_style(ws_t7.cell(3, c_tot_all), font=font_header, fill=fill_total, alignment=align_center)
 
     all_comb_list = nv_list + htcs_list
     for idx, nv in enumerate(all_comb_list, start=4):
@@ -260,12 +290,18 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         ws_t7.cell(idx, 2, nv["ma_cb"])
         ws_t7.cell(idx, 3, nv["ho_ten"])
         
-        wk_cols_letters = [get_column_letter(4 + i) for i in range(len(weekend_days))]
-        ws_t7.cell(idx, tot_col, f'={build_code_formula(wk_cols_letters, idx, "x", "xx")} + {build_duty_formula(wk_cols_letters, idx)}')
+        # 1. Tổng T7, CN
+        ws_t7.cell(idx, c_tot_sat, f'={build_code_formula(wk_sat_sun_cols, idx, "x", "xx")} + {build_duty_formula(wk_sat_sun_cols, idx)}')
+        # 2. Tổng Lễ/Tết
+        ws_t7.cell(idx, c_tot_hol, f'={build_code_formula(wk_holiday_cols, idx, "x", "xx")} + {build_duty_formula(wk_holiday_cols, idx)}')
+        # 3. Tổng cộng toàn bộ
+        c_sat_l = get_column_letter(c_tot_sat)
+        c_hol_l = get_column_letter(c_tot_hol)
+        ws_t7.cell(idx, c_tot_all, f'={c_sat_l}{idx} + {c_hol_l}{idx}')
         
-        for c_idx in range(1, tot_col + 1):
+        for c_idx in range(1, c_tot_all + 1):
             cell = ws_t7.cell(idx, c_idx)
-            fill_color = weekend_days[c_idx - 4][1] if (4 <= c_idx < tot_col) else None
+            fill_color = weekend_days[c_idx - 4][1] if (4 <= c_idx < c_tot_sat) else (fill_total if c_idx == c_tot_all else None)
             set_style(cell, font=font_data, fill=fill_color, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 4) else align_left
 
@@ -300,7 +336,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         ws_abc.cell(idx, 4, nv["chuc_vu"])
         
         nv_row = idx - 1
-        # Liên kết công thức từ Sheet "NHÂN VIÊN"
         ws_abc.cell(idx, 5, f"='NHÂN VIÊN'!{get_column_letter(start_sum)}{nv_row}")
         ws_abc.cell(idx, 6, f"='NHÂN VIÊN'!{get_column_letter(start_sum+1)}{nv_row}")
         ws_abc.cell(idx, 7, f"='NHÂN VIÊN'!{get_column_letter(start_sum+2)}{nv_row}")
@@ -313,7 +348,6 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         
         ws_abc.cell(idx, 13, f"='NHÂN VIÊN'!{get_column_letter(start_sum+8)}{nv_row}")
         
-        # Đã sửa lỗi escape chuỗi ở công thức tính Nghỉ phép:
         p_list = [f"'NHÂN VIÊN'!{c}" for c in all_month_cols]
         ws_abc.cell(idx, 14, f"={build_code_formula(p_list, nv_row, 'p', 'pp')}")
         
@@ -340,7 +374,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
 
 
 # =====================================================================
-# 3. HÀM SẮP XẾP DANH SÁCH "ĐƠN VỊ XUẤT DỮ LIỆU" THEO ĐÚNG THỨ TỰ
+# 3. HÀM SẮP XẾP DANH SÁCH "ĐƠN VỊ XUẤT DỮ LIỆU"
 # =====================================================================
 def get_ordered_phong_ban_list(df_cb):
     list_phong, list_khoa, list_trung_tam = [], [], []
