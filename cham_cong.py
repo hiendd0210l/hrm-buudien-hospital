@@ -7,9 +7,9 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# ---------------------------------------------------------------------
-# HÀM BỔ TRỢ PHÂN LOẠI NGÀY (T7, CN, LỄ)
-# ---------------------------------------------------------------------
+# =====================================================================
+# 1. HÀM BỔ TRỢ PHÂN LOẠI NGÀY & CẤU HÌNH STYLE EXCEL
+# =====================================================================
 def get_day_type(day: int, month: int, year: int):
     dt = date(year, month, day)
     weekday = dt.weekday()  # 5: Thứ 7, 6: Chủ nhật
@@ -35,40 +35,39 @@ def set_style(cell, font=None, fill=None, alignment=None, border=None):
 
 def autofit_column_widths_smart(ws):
     """
-    Căn chỉnh độ rộng cột tối ưu:
-    Không bị phình to do các tiêu đề gộp cell (Header Merge Rows).
+    Căn chỉnh độ rộng cột chuẩn xác:
+    Bỏ qua các dòng tiêu đề tổng/merged (Dòng 1-4) để tránh cột STT, Mã NV, Nghỉ phép... bị phình to.
     """
     for col in ws.columns:
         col_idx = col[0].column
         col_letter = get_column_letter(col_idx)
         
-        # Mặc định chiều rộng nhỏ gọn cho STT
+        # Mặc định chiều rộng nhỏ gọn cho cột STT
         if col_idx == 1:
             ws.column_dimensions[col_letter].width = 6
             continue
             
         max_len = 0
-        # Chỉ tính chiều dài chuỗi dữ liệu từ dòng 5 trở đi (bỏ qua Header)
+        # Chỉ tính chiều dài chuỗi dữ liệu từ dòng 5 trở đi (Bỏ qua Header)
         for cell in col[4:]:
             if cell.value is not None:
                 val_str = str(cell.value)
-                # Bỏ qua công thức excel trong tính toán độ rộng
                 if not val_str.startswith("="):
                     max_len = max(max_len, len(val_str))
         
-        # Phân loại độ rộng cột theo nội dung
+        # Phân loại độ rộng cột tối ưu
         if col_idx == 2:  # Mã NV
             ws.column_dimensions[col_letter].width = max(max_len + 3, 10)
-        elif col_idx == 3 or col_idx == 4:  # Họ tên / Chức vụ
+        elif col_idx in [3, 4]:  # Họ tên / Chức vụ
             ws.column_dimensions[col_letter].width = max(max_len + 4, 22)
         else:
-            # Các cột chỉ số, công ngày, nghỉ phép, trực...
+            # Các cột chỉ số ngày công, trực, phép...
             ws.column_dimensions[col_letter].width = max(max_len + 3, 7)
 
 
-# ---------------------------------------------------------------------
-# HÀM TẠO FILE EXCEL CHUẨN 4 SHEET (NV, HTCS, LÀM THỨ 7, ABC)
-# ---------------------------------------------------------------------
+# =====================================================================
+# 2. HÀM TẠO FILE EXCEL CHUẨN 4 SHEET (NHÂN VIÊN, HTCS, LÀM THỨ 7, ABC)
+# =====================================================================
 def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: pd.DataFrame = None) -> bytes:
     wb = openpyxl.Workbook()
     
@@ -95,7 +94,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
                 else:
                     nv_list.append(item)
 
-    # Mẫu dự phòng nếu dữ liệu trống
+    # Dữ liệu mẫu nếu chưa load dữ liệu cán bộ
     if not nv_list and not htcs_list:
         nv_list = [
             {"ma_cb": "N1096", "ho_ten": "Nguyễn Thị Thảo Nguyên", "chuc_vu": "Bác sĩ", "khoa_phong": "Khoa Khám bệnh"},
@@ -148,6 +147,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         parts = [f'IF(OR({c}{row_idx}="T",{c}{row_idx}="t"),1,0)' for c in col_list]
         return " + ".join(parts)
 
+    # Hàm dựng Bảng chấm công chính
     def build_main_sheet(ws, title_sheet, data_list):
         ws.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws.cell(1, 1), font=font_subtitle)
         ws.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} ({title_sheet})")
@@ -225,7 +225,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     ws_nv.title = "NHÂN VIÊN"
     start_sum = build_main_sheet(ws_nv, "CỦA CBNV", nv_list)
 
-    # SHEET 2: HTCS
+    # SHEET 2: HTCS (Thứ tự thêm sheet HTCS theo yêu cầu)
     ws_htcs = wb.create_sheet(title="HTCS")
     build_main_sheet(ws_htcs, "LAO ĐỘNG THUÊ LẠI / HTCS", htcs_list)
 
@@ -313,7 +313,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             set_style(cell, font=font_data, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 5) else align_left
 
-    # Áp dụng thuật toán Auto-fit chuẩn không bị phình to cột
+    # Tự động điều chỉnh độ rộng cột tối ưu
     for ws in wb.worksheets:
         ws.views.sheetView[0].showGridLines = True
         autofit_column_widths_smart(ws)
@@ -323,9 +323,10 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
     return output.getvalue()
 
 
-# ---------------------------------------------------------------------
-# HÀM SẮP XẾP DANH SÁCH ĐƠN VỊ ĐÚNG THỨ TỰ
-# ---------------------------------------------------------------------
+# =====================================================================
+# 3. HÀM SẮP XẾP DANH SÁCH "ĐƠN VỊ XUẤT DỮ LIỆU" THEO ĐÚNG THỨ TỰ
+# Thứ tự: Tất cả -> Phòng (ABC) -> Khoa (ABC) -> Trung tâm (ABC)
+# =====================================================================
 def get_ordered_phong_ban_list(df_cb):
     list_phong, list_khoa, list_trung_tam = [], [], []
     
@@ -341,7 +342,7 @@ def get_ordered_phong_ban_list(df_cb):
                 list_khoa.append(kp)
 
     if not list_phong and not list_khoa and not list_trung_tam:
-        list_phong = ["Phòng Tổ chức Cán bộ", "Phòng Kế hoạch Tổng hợp", "Phòng Tài chính Kế toán"]
+        list_phong = ["Phòng Kế hoạch Tổng hợp", "Phòng Tài chính Kế toán", "Phòng Tổ chức Cán bộ"]
         list_khoa = ["Khoa Cấp cứu", "Khoa Khám bệnh", "Khoa Ngoại tổng hợp", "Khoa Nội tổng hợp"]
         list_trung_tam = ["Trung tâm Đột quỵ", "Trung tâm Y học hạt nhân"]
 
@@ -352,9 +353,9 @@ def get_ordered_phong_ban_list(df_cb):
     return ["Tất cả khoa/phòng/trung tâm"] + list_phong + list_khoa + list_trung_tam
 
 
-# ---------------------------------------------------------------------
-# HÀM HIỂN THỊ GIAO DIỆN STREAMLIT DASHBOARD TÍCH HỢP
-# ---------------------------------------------------------------------
+# =====================================================================
+# 4. GIAO DIỆN STREAMLIT DASHBOARD
+# =====================================================================
 def render_quan_ly_cham_cong(df_cb=None):
     st.title("📋 Quản lý & Xuất Bảng Chấm Công Bệnh Viện")
 
@@ -363,6 +364,7 @@ def render_quan_ly_cham_cong(df_cb=None):
 
     danh_sach_don_vi = get_ordered_phong_ban_list(df_cb)
 
+    # 1. Cấu hình thông số (Sửa tiêu đề "Đơn vị xuất dữ liệu")
     st.subheader("⚙️ Cấu hình thông số xuất file")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -372,8 +374,9 @@ def render_quan_ly_cham_cong(df_cb=None):
     with col3:
         don_vi_selected = st.selectbox("Đơn vị xuất dữ liệu", options=danh_sach_don_vi)
 
-    # Hiển thị Metrics (Đã bỏ hình ảnh/metric Cấu trúc File Excel)
     st.markdown("---")
+
+    # 2. Hiển thị Metrics (Đã xóa bỏ hoàn toàn metric Cấu trúc File Excel)
     num_days = calendar.monthrange(year, month)[1]
     
     total_nv = 0
@@ -386,14 +389,14 @@ def render_quan_ly_cham_cong(df_cb=None):
         total_nv = 6
 
     m1, m2, m3 = st.columns(3)
-    m1.metric("Tổng cán bộ/nhân viên", f"{total_nv} người")
+    m1.metric("Tổng cán bộ / Nhân viên", f"{total_nv} người")
     m2.metric("Số ngày trong tháng", f"{num_days} ngày")
-    m3.metric("Tháng/Năm áp dụng", f"T{month:02d}/{year}")
+    m3.metric("Tháng / Năm áp dụng", f"T{month:02d}/{year}")
 
-    # Tự động khởi tạo dữ liệu file Excel
+    # Tự động cập nhật dữ liệu file theo đúng tùy chọn Đơn vị xuất dữ liệu
     excel_data = generate_excel_mau_cham_cong(month, year, don_vi_selected, df_cb)
 
-    # Khu vực Xuất File Excel
+    # 3. Khu vực Xuất File Excel
     st.write("### 📥 Tải xuống Bảng chấm công Excel")
     file_name_clean = don_vi_selected.replace("Tất cả khoa/phòng/trung tâm", "Tat_Ca_Khoa_Phong").replace(" ", "_").replace("/", "_")
     target_file_name = f"Bang_Cham_Cong_{file_name_clean}_T{month:02d}_{year}.xlsx"
@@ -403,7 +406,7 @@ def render_quan_ly_cham_cong(df_cb=None):
         if st.button("🚀 Khởi tạo & Tạo File Excel", type="primary", use_container_width=True):
             st.session_state["cham_cong_excel_bytes"] = excel_data
             st.session_state["cham_cong_file_name"] = target_file_name
-            st.success("Khởi tạo file thành công!")
+            st.success("Tạo file chấm công thành công!")
 
     with col_btn2:
         download_bytes = st.session_state.get("cham_cong_excel_bytes", excel_data)
@@ -417,13 +420,10 @@ def render_quan_ly_cham_cong(df_cb=None):
             use_container_width=True
         )
 
-    # ---------------------------------------------------------------------
-    # BẢNG TỔNG HỢP BÌNH BẦU XẾP LOẠI LAO ĐỘNG TOÀN BỆNH VIỆN (CHUẨN SHEET ABC)
-    # ---------------------------------------------------------------------
+    # 4. ĐƯA BẢNG TỔNG HỢP CHẤM CÔNG / BÌNH BẦU (SHEET ABC) LÊN KHU VỰC KHOẢNG TRỐNG BÊN DƯỚI
     st.markdown("---")
     st.subheader(f"📊 Bảng tổng hợp bình bầu xếp loại lao động toàn Bệnh viện (Tháng {month:02d}/{year})")
     
-    # Tạo DataFrame mô phỏng dữ liệu đầy đủ theo đúng mẫu Sheet "ABC"
     if isinstance(df_cb, pd.DataFrame) and not df_cb.empty:
         df_abc = df_cb.copy()
         if don_vi_selected != "Tất cả khoa/phòng/trung tâm" and "khoa_phong" in df_abc.columns:
@@ -444,7 +444,7 @@ def render_quan_ly_cham_cong(df_cb=None):
             "Mã NV": row.get("ma_can_bo", f"NV{idx+1:03d}"),
             "Họ và tên": row.get("ho_ten", ""),
             "Chức vụ": row.get("chuc_vu", "Nhân viên"),
-            "Khoa/Phòng/Trung tâm": row.get("khoa_phong", "Khoa Khám bệnh"),
+            "Đơn vị / Khoa phòng": row.get("khoa_phong", "Khoa Khám bệnh"),
             "Đi làm (X/XX)": 22.0,
             "Trực (T)": 4,
             "Nghỉ bù (B/BB)": 0,
@@ -458,6 +458,7 @@ def render_quan_ly_cham_cong(df_cb=None):
         })
 
     df_summary = pd.DataFrame(records)
+    
     st.dataframe(
         df_summary, 
         use_container_width=True, 
@@ -466,7 +467,12 @@ def render_quan_ly_cham_cong(df_cb=None):
             "STT": st.column_config.NumberColumn("STT", width="small"),
             "Mã NV": st.column_config.TextColumn("Mã NV", width="small"),
             "Họ và tên": st.column_config.TextColumn("Họ và tên", width="medium"),
-            "Khoa/Phòng/Trung tâm": st.column_config.TextColumn("Khoa/Phòng/Trung tâm", width="medium"),
+            "Đơn vị / Khoa phòng": st.column_config.TextColumn("Đơn vị / Khoa phòng", width="medium"),
             "Xếp loại": st.column_config.TextColumn("Xếp loại", width="small")
         }
     )
+
+# Chạy thử trực tiếp nếu gọi file độc lập
+if __name__ == "__main__":
+    st.set_page_config(page_title="Chấm công Bệnh viện", layout="wide")
+    render_quan_ly_cham_cong()
