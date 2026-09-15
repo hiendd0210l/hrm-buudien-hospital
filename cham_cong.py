@@ -35,7 +35,7 @@ def set_style(cell, font=None, fill=None, alignment=None, border=None):
 
 
 # ---------------------------------------------------------------------
-# HÀM TẠO FILE EXCEL CHUẨN ĐÚNG NGUYÊN TẮC
+# HÀM TẠO FILE EXCEL CHUẨN ĐÚNG NGUYÊN TẮC (3 SHEET)
 # ---------------------------------------------------------------------
 def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: pd.DataFrame = None) -> bytes:
     wb = openpyxl.Workbook()
@@ -106,7 +106,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             parts.append(f'IF(OR({c}{row_idx}="T",{c}{row_idx}="t"),1,0)')
         return " + ".join(parts)
 
-    # SHEET 1: NHÂN VIÊN
+    # ==================== SHEET 1: NHÂN VIÊN ====================
     ws_nv = wb.active
     ws_nv.title = "NHÂN VIÊN"
     
@@ -180,7 +180,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             set_style(cell, font=font_data, fill=f_fill, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 4) else align_left
 
-    # SHEET 2: LÀM THỨ 7
+    # ==================== SHEET 2: LÀM THỨ 7 ====================
     ws_t7 = wb.create_sheet(title="LÀM THỨ 7")
     ws_t7.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_t7.cell(1, 1), font=font_subtitle)
     ws_t7.cell(1, 4, f"BẢNG CHẤM CÔNG NGÀY LÀM THỨ 7, CHỦ NHẬT & NGÀY LỄ CỦA CBNV THÁNG {month:02d}/{year}")
@@ -222,7 +222,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             set_style(cell, font=font_data, fill=fill_color, border=thin_border)
             cell.alignment = align_center_nowrap if (c_idx in [1, 2] or c_idx >= 4) else align_left
 
-    # SHEET 3: ABC
+    # ==================== SHEET 3: ABC ====================
     ws_abc = wb.create_sheet(title="ABC")
     ws_abc.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws_abc.cell(1, 1), font=font_subtitle)
     ws_abc.cell(2, 1, f"Đơn vị: {phong_ban}"); set_style(ws_abc.cell(2, 1), font=font_subtitle)
@@ -276,32 +276,110 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
 
 
 # ---------------------------------------------------------------------
-# HÀM HIỂN THỊ GIAO DIỆN STREAMLIT (TÍCH HỢP VÀO APP MAIN)
+# HÀM HIỂN THỊ GIAO DIỆN STREAMLIT DASHBOARD TÍCH HỢP
 # ---------------------------------------------------------------------
 def render_quan_ly_cham_cong(df_cb=None):
-    st.title("📋 Quản lý & Xuất Bảng Chấm Công")
-    
+    st.title("📋 Quản lý & Xuất Bảng Chấm Công Bệnh Viện")
+    st.caption("Khởi tạo file Excel chấm công chuẩn 3 Sheet (NHÂN VIÊN, LÀM THỨ 7, ABC) theo quy định Bệnh viện Bưu điện")
+
+    # Lấy dữ liệu cán bộ từ session nếu không được truyền vào
+    if df_cb is None:
+        df_cb = st.session_state.get("df_can_bo", pd.DataFrame())
+
+    # Lọc danh sách khoa phòng
+    danh_sach_phong_ban = ["Tất cả Khoa / Phòng"]
+    if isinstance(df_cb, pd.DataFrame) and not df_cb.empty and "khoa_phong" in df_cb.columns:
+        list_kp = [kp for kp in df_cb["khoa_phong"].dropna().unique() if str(kp).strip()]
+        danh_sach_phong_ban.extend(list_kp)
+    if len(danh_sach_phong_ban) == 1:
+        danh_sach_phong_ban = ["Khoa Khám bệnh", "Khoa Cấp cứu", "Khoa Ngoại", "Khoa Nội", "Phòng TỔ CHỨC CÁN BỘ"]
+
+    # Thanh cấu hình thông số
+    st.subheader("⚙️ Cấu hình bảng chấm công xuất Excel")
     col1, col2, col3 = st.columns(3)
     with col1:
-        month = st.number_input("Tháng", min_value=1, max_value=12, value=datetime.now().month)
+        month = st.number_input("Tháng chấm công", min_value=1, max_value=12, value=datetime.now().month)
     with col2:
-        year = st.number_input("Năm", min_value=2020, max_value=2030, value=datetime.now().year)
+        year = st.number_input("Năm chấm công", min_value=2020, max_value=2030, value=datetime.now().year)
     with col3:
-        phong_ban = st.text_input("Khoa / Phòng ban", value="Khoa Khám bệnh")
+        phong_ban_selected = st.selectbox("Khoa / Phòng ban xuất dữ liệu", options=danh_sach_phong_ban)
 
+    phong_ban_export = phong_ban_selected if phong_ban_selected != "Tất cả Khoa / Phòng" else "Khoa Khám bệnh"
+
+    # Hiển thị Metrics tổng quan
     st.markdown("---")
+    num_days = calendar.monthrange(year, month)[1]
     
-    if df_cb is None:
-        df_cb = st.session_state.get("df_can_bo", None)
-    
-    if st.button("🚀 Tạo & Tải Mẫu Bảng Chấm Công Excel", type="primary"):
-        with st.spinner("Đang khởi tạo file Excel chuẩn..."):
-            excel_data = generate_excel_mau_cham_cong(month, year, phong_ban, df_cb)
-            
-            st.success("Tạo bảng chấm công thành công!")
-            st.download_button(
-                label="📥 Tải xuống file Excel (.xlsx)",
-                data=excel_data,
-                file_name=f"Bang_Cham_Cong_{phong_ban.replace(' ', '_')}_T{month:02d}_{year}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+    total_nv = 0
+    if isinstance(df_cb, pd.DataFrame) and not df_cb.empty and "khoa_phong" in df_cb.columns:
+        if phong_ban_selected == "Tất cả Khoa / Phòng":
+            total_nv = len(df_cb)
+        else:
+            total_nv = len(df_cb[df_cb["khoa_phong"] == phong_ban_selected])
+    else:
+        total_nv = 5
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Tổng cán bộ/nhân viên", f"{total_nv} người")
+    m2.metric("Số ngày trong tháng", f"{num_days} ngày")
+    m3.metric("Tháng/Năm áp dụng", f"T{month:02d}/{year}")
+    m4.metric("Cấu trúc File Excel", "3 Sheets chuẩn")
+
+    # Tabs chức năng
+    tab1, tab2, tab3 = st.tabs(["📥 Xuất file Excel chấm công", "📜 Quy ước Ký hiệu Chấm công", "👥 Danh sách nhân sự"])
+
+    with tab1:
+        st.write("### Tải xuống Bảng chấm công mẫu Excel")
+        st.info("File Excel xuất ra sẽ chứa đầy đủ các công thức tự động tính ngày công (`COUNTIF`), nghỉ bù, xếp loại ABC và định dạng màu phân biệt Ngày lễ / Thứ 7 / Chủ nhật.")
+        
+        col_btn1, col_btn2 = st.columns([2, 3])
+        with col_btn1:
+            if st.button("🚀 Khởi tạo & Tạo File Excel", type="primary", use_container_width=True):
+                with st.spinner("Đang tổng hợp công thức và tạo file Excel..."):
+                    excel_bytes = generate_excel_mau_cham_cong(month, year, phong_ban_export, df_cb)
+                    st.session_state["cham_cong_excel_bytes"] = excel_bytes
+                    st.success("Khởi tạo bảng chấm công thành công!")
+
+        with col_btn2:
+            if "cham_cong_excel_bytes" in st.session_state:
+                st.download_button(
+                    label="📥 Tải xuống File Excel (.xlsx)",
+                    data=st.session_state["cham_cong_excel_bytes"],
+                    file_name=f"Bang_Cham_Cong_{phong_ban_export.replace(' ', '_')}_T{month:02d}_{year}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+
+    with tab2:
+        st.write("### Quy ước Ký hiệu dùng trong Bảng Chấm Công")
+        ky_hieu_data = {
+            "Ký hiệu": ["X", "XX", "T", "P", "PP", "B", "BB", "TS", "Ô", "ÔÔ", "C", "CC", "H", "HH"],
+            "Diễn giải": [
+                "Làm việc nửa ngày (0.5 công)",
+                "Làm việc cả ngày (1.0 công)",
+                "Trực ngày/đêm ngoài giờ",
+                "Nghỉ phép nửa ngày",
+                "Nghỉ phép cả ngày",
+                "Nghỉ bù nửa ngày",
+                "Nghỉ bù cả ngày",
+                "Nghỉ thai sản",
+                "Nghỉ ốm nửa ngày",
+                "Nghỉ ốm cả ngày",
+                "Đi công tác nửa ngày",
+                "Đi công tác cả ngày",
+                "Đi học nửa ngày",
+                "Đi học cả ngày"
+            ],
+            "Quy đổi công": ["0.5", "1.0", "Trực", "Phép", "Phép", "Bù", "Bù", "Thai sản", "Ốm", "Ốm", "Công tác", "Công tác", "Đi học", "Đi học"]
+        }
+        st.dataframe(pd.DataFrame(ky_hieu_data), use_container_width=True, hide_index=True)
+
+    with tab3:
+        st.write(f"### Danh sách Nhân sự thuộc: **{phong_ban_selected}**")
+        if isinstance(df_cb, pd.DataFrame) and not df_cb.empty:
+            df_display = df_cb.copy()
+            if phong_ban_selected != "Tất cả Khoa / Phòng" and "khoa_phong" in df_display.columns:
+                df_display = df_display[df_display["khoa_phong"] == phong_ban_selected]
+            st.dataframe(df_display, use_container_width=True)
+        else:
+            st.warning("Hiện chưa có dữ liệu cán bộ trong hệ thống. Hệ thống sẽ xuất file Excel với danh sách cán bộ mẫu.")
