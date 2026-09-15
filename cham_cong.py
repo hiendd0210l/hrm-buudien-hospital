@@ -278,7 +278,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
 # ---------------------------------------------------------------------
 # HÀM HIỂN THỊ GIAO DIỆN STREAMLIT (TÍCH HỢP VÀO APP MAIN)
 # ---------------------------------------------------------------------
-def render_quan_ly_cham_cong():
+def render_quan_ly_cham_cong(df_cb=None):
     st.title("📋 Quản lý & Xuất Bảng Chấm Công")
     
     col1, col2, col3 = st.columns(3)
@@ -291,7 +291,8 @@ def render_quan_ly_cham_cong():
 
     st.markdown("---")
     
-    df_cb = st.session_state.get("df_can_bo", None)
+    if df_cb is None:
+        df_cb = st.session_state.get("df_can_bo", None)
     
     if st.button("🚀 Tạo & Tải Mẫu Bảng Chấm Công Excel", type="primary"):
         with st.spinner("Đang khởi tạo file Excel chuẩn..."):
