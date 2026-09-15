@@ -8,10 +8,10 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> bytes:
-    """Tạo file Excel mẫu Bảng chấm công đầy đủ các tab theo chuẩn cấu trúc thực tế"""
+    """Tự động sinh file Excel mẫu Bảng chấm công chuẩn 5 sheets theo cấu trúc thực tế"""
     wb = openpyxl.Workbook()
     
-    # Font & Style
+    # Cấu hình Font & Style
     font_title = Font(name="Times New Roman", size=14, bold=True, color="002060")
     font_subtitle = Font(name="Times New Roman", size=11, bold=True)
     font_header = Font(name="Times New Roman", size=10, bold=True)
@@ -35,9 +35,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> 
         ("HTCS", f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} CỦA NHÂN VIÊN LAO ĐỘNG THUÊ LẠI")
     ]
     
-    # Loại bỏ sheet mặc định ban đầu
     first_sheet = True
-    
     for sheet_name, title_text in sheets_config:
         if first_sheet:
             ws = wb.active
@@ -46,17 +44,21 @@ def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> 
         else:
             ws = wb.create_sheet(title=sheet_name)
             
-        # Tiêu đề
-        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_days + 3)
+        # Tiêu đề sheet
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_days + 4)
         cell_t = ws.cell(1, 1, title_text)
         cell_t.font = font_title
         cell_t.alignment = Alignment(horizontal="center", vertical="center")
         
-        # Header cột
+        # Tiêu đề cột
         ws.cell(3, 1, "STT").font = font_header
         ws.cell(3, 2, "Mã NV").font = font_header
         ws.cell(3, 3, "Họ và tên").font = font_header
         
+        for col_i in [1, 2, 3]:
+            ws.cell(3, col_i).fill = fill_header
+            ws.cell(3, col_i).alignment = Alignment(horizontal="center")
+
         for d in range(1, num_days + 1):
             col_idx = 3 + d
             cell_d = ws.cell(3, col_idx, f"{d:02d}/{month:02d}")
@@ -65,8 +67,9 @@ def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> 
             cell_d.fill = fill_header
 
         ws.cell(3, num_days + 4, "Tổng công").font = font_header
+        ws.cell(3, num_days + 4).fill = fill_header
 
-        # Đổ danh sách nhân sự mẫu
+        # Đổ danh sách cán bộ
         row_start = 4
         if not df_cb.empty:
             for idx, r in df_cb.iterrows():
@@ -74,13 +77,18 @@ def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> 
                 ws.cell(row_start, 2, str(r.get('ma_can_bo', ''))).alignment = Alignment(horizontal="center")
                 ws.cell(row_start, 3, str(r.get('ho_ten', '')))
                 
-                # Điền ký hiệu XX mặc định cho ngày làm việc
                 for d in range(1, num_days + 1):
                     weekday = datetime(year, month, d).weekday()
                     val = "XX" if weekday < 5 else ""
                     c_day = ws.cell(row_start, 3 + d, val)
                     c_day.alignment = Alignment(horizontal="center")
                     c_day.font = font_data
+                    c_day.border = thin_border
+
+                ws.cell(row_start, 1).border = thin_border
+                ws.cell(row_start, 2).border = thin_border
+                ws.cell(row_start, 3).border = thin_border
+                ws.cell(row_start, num_days + 4).border = thin_border
                 row_start += 1
 
     # ---------------------------------------------------------------------
@@ -97,6 +105,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> 
         c = ws_t7.cell(3, col_i, h)
         c.font = font_header
         c.fill = fill_header
+        c.alignment = Alignment(horizontal="center")
 
     # ---------------------------------------------------------------------
     # TAB 4: ABC (BÌNH BẦU XẾP LOẠI)
@@ -113,21 +122,22 @@ def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> 
         c = ws_abc.cell(5, col_i, h)
         c.font = font_header
         c.fill = fill_header
+        c.alignment = Alignment(horizontal="center")
 
     # ---------------------------------------------------------------------
-    # TAB 5: KÝ HIỆU
+    # TAB 5: KÝ HIỆU CHẤM CÔNG
     # ---------------------------------------------------------------------
     ws_kh = wb.create_sheet(title="Ký hiệu")
     ws_kh.cell(1, 1, "BẢNG GIẢI THÍCH KÝ HIỆU CHẤM CÔNG").font = font_title
     
     ky_hieu_data = [
-        ("X", "Công đi làm 1/2 ngày trong giờ hành chính"),
-        ("XX", "Công đi làm 1 ngày trong giờ hành chính"),
-        ("T", "Trực ngoài giờ ngày thường hoặc trực 24/24 giờ ngày Thứ Bảy, Chủ Nhật, Lễ, Tết"),
+        ("X", "công đi làm 1/2 ngày trong giờ hành chính"),
+        ("XX", "công đi làm 1 ngày trong giờ hành chính"),
+        ("T", "Trực ngoài giờ ngày thường hoặc trực 24/24 giờ ngày thứ Bảy, Chủ nhật, ngày Lễ, Tết"),
         ("C", "Đi công tác 1/2 ngày"),
         ("CC", "Đi công tác 1 ngày"),
-        ("B", "Nghỉ bù trực, bù ngày làm Thứ Bảy, Chủ Nhật, Lễ Tết 1/2 ngày"),
-        ("BB", "Nghỉ bù trực, bù ngày làm Thứ Bảy, Chủ Nhật, Lễ Tết 1 ngày"),
+        ("B", "Nghỉ bù trực, bù ngày làm thứ Bảy, Chủ nhật, ngày Lễ, Tết 1/2 ngày"),
+        ("BB", "Nghỉ bù trực, bù ngày làm thứ Bảy, Chủ nhật, ngày Lễ, Tết 1 ngày"),
         ("P", "Nghỉ phép 1/2 ngày"),
         ("PP", "Nghỉ phép 1 ngày"),
         ("TS", "Nghỉ thai sản"),
@@ -138,6 +148,8 @@ def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> 
     
     ws_kh.cell(3, 1, "Ký hiệu").font = font_header
     ws_kh.cell(3, 2, "Diễn giải ý nghĩa").font = font_header
+    ws_kh.cell(3, 1).fill = fill_header
+    ws_kh.cell(3, 2).fill = fill_header
     
     for r_idx, (kh, val) in enumerate(ky_hieu_data, start=4):
         c_kh = ws_kh.cell(r_idx, 1, kh)
@@ -146,7 +158,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> 
         c_kh.alignment = Alignment(horizontal="center")
         c_val.font = font_data
 
-    # Tự động chỉnh độ rộng cột
+    # Tự động căn chỉnh độ rộng các cột
     for ws_curr in wb.worksheets:
         for col in ws_curr.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
@@ -159,7 +171,7 @@ def generate_excel_mau_cham_cong(month: int, year: int, df_cb: pd.DataFrame) -> 
 
 
 def init_cham_cong_session():
-    """Khởi tạo session state riêng cho mô-đun chấm công nếu chưa có"""
+    """Khởi tạo session state riêng cho mô-đun chấm công"""
     if 'don_nghi_phep' not in st.session_state:
         st.session_state['don_nghi_phep'] = pd.DataFrame([
             {"id": 1, "ma_can_bo": "N1971", "ho_ten": "Khuất Duy Tiến", "khoa_phong": "Khoa Ngoại tổng hợp", "loai_nghi": "Nghỉ phép năm", "tu_ngay": "2026-09-10", "den_ngay": "2026-09-12", "so_ngay": 3, "ly_do": "Giải quyết việc gia đình", "trang_thai": "Đã phê duyệt"},
@@ -168,12 +180,13 @@ def init_cham_cong_session():
 
 
 def render_quan_ly_cham_cong(df_cb):
-    """Hàm chính hiển thị giao diện Quản lý Chấm công & Ngày nghỉ."""
+    """Giao diện chính mô-đun Quản lý Chấm công & Ngày nghỉ"""
     init_cham_cong_session()
     
     st.markdown("---")
     st.subheader("⏰ QUẢN LÝ CHẤM CÔNG & NGÀY NGHỈ - BỆNH VIỆN BƯU ĐIỆN")
     
+    # 4 TABS GIAO DIỆN
     tab_cc1, tab_cc2, tab_cc3, tab_cc4 = st.tabs([
         "📊 Bảng Tổng hợp Chấm công", 
         "📝 Đăng ký Nghỉ phép / Nghỉ bù", 
@@ -185,7 +198,7 @@ def render_quan_ly_cham_cong(df_cb):
     with tab_cc1:
         st.markdown("##### 📅 **Bảng tổng hợp công lao động & Ngày nghỉ trong tháng**")
         col_m1, col_m2, _ = st.columns([1.5, 1.5, 2])
-        month_sel = col_m1.selectbox("Chọn tháng:", [f"Tháng {i:02d}/2026" for i in range(1, 13)], index=7)
+        month_sel = col_m1.selectbox("Chọn tháng:", [f"Tháng {i:02d}/2026" for i in range(1, 13)], index=8)
         
         dept_options = ["-- Tất cả Khoa / Phòng --"]
         if not df_cb.empty and 'khoa_phong' in df_cb.columns:
@@ -243,15 +256,16 @@ def render_quan_ly_cham_cong(df_cb):
         st.markdown("##### ✅ **Danh sách Đơn xin nghỉ phép chờ phê duyệt**")
         st.dataframe(st.session_state['don_nghi_phep'], use_container_width=True, hide_index=True)
 
-    # TAB 4: IMPORT & TẠO FILE MẪU EXCEL
+    # TAB 4: TẠO FILE EXCEL MẪU & IMPORT BẢNG CHẤM CÔNG
     with tab_cc4:
         st.markdown("##### 📄 **1. Tự động tạo File Excel mẫu Bảng Chấm Công theo tháng**")
-        st.caption("Xuất file mẫu chuẩn gồm các Sheet: **NHÂN VIÊN**, **HTCS**, **LÀM THỨ 7**, **ABC** và **Ký hiệu** để gửi các Khoa/Phòng.")
+        st.caption("Xuất file Excel mẫu đầy đủ các tab: **NHÂN VIÊN**, **HTCS**, **LÀM THỨ 7**, **ABC** và **Ký hiệu** để các đơn vị tự chấm công.")
         
         c_m1, c_m2, c_m3 = st.columns([1, 1, 2])
         sel_month = c_m1.selectbox("Chọn tháng xuất mẫu:", list(range(1, 13)), index=datetime.now().month - 1)
         sel_year = c_m2.number_input("Chọn năm:", min_value=2024, max_value=2030, value=2026)
         
+        # Sinh dữ liệu Excel mẫu dựa trên tháng/năm đã chọn
         excel_bytes = generate_excel_mau_cham_cong(sel_month, sel_year, df_cb)
         
         c_m3.markdown("<br>", unsafe_allow_html=True)
@@ -264,7 +278,7 @@ def render_quan_ly_cham_cong(df_cb):
         )
 
         st.markdown("---")
-        st.markdown("##### 📥 **2. Tải lên Bảng Chấm Công từ các Đơn vị**")
+        st.markdown("##### 📥 **2. Tải lên Bảng Chấm Công đã chấm từ các Đơn vị**")
         file_cc = st.file_uploader("Tải file chấm công đã điền (.xlsx, .csv):", type=["xlsx", "xls", "csv"], key="file_uploader_cc")
         if file_cc is not None:
-            st.success("File chấm công đã được tải lên thành công. Hệ thống đã sẵn sàng đối soát và tổng hợp dữ liệu!")
+            st.success("File chấm công đã được tải lên thành công. Hệ thống đã sẵn sàng đối soát dữ liệu!")
