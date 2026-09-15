@@ -143,10 +143,21 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
         parts = [f'IF(OR({c}{row_idx}="T",{c}{row_idx}="t"),1,0)' for c in col_list]
         return " + ".join(parts)
 
-    def build_main_sheet(ws, title_sheet, data_list):
+    # Chuẩn hóa tên đơn vị hiển thị ở tiêu đề dòng 1
+    if phong_ban == "Tất cả khoa/phòng/trung tâm":
+        str_don_vi_title = "TOÀN BỆNH VIỆN"
+    else:
+        str_don_vi_title = phong_ban.upper()
+
+    def build_main_sheet(ws, title_sheet_suffix, data_list):
         ws.cell(1, 1, "BỆNH VIỆN BƯU ĐIỆN"); set_style(ws.cell(1, 1), font=font_subtitle)
-        ws.cell(1, 4, f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} ({title_sheet})")
-        ws.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 19)
+        
+        # Tiêu đề dòng 1 được bổ sung tên đơn vị
+        title_text = f"BẢNG CHẤM CÔNG THÁNG {month:02d} NĂM {year} (CỦA CBNV {str_don_vi_title})"
+        ws.cell(1, 4, title_text)
+        
+        # Bỏ cột Tồn bù nên tổng cột giảm đi 1 (15 cột tổng hợp thay vì 16)
+        ws.merge_cells(start_row=1, start_column=4, end_row=1, end_column=num_days + 18)
         set_style(ws.cell(1, 4), font=font_title, alignment=align_center)
         ws.cell(2, 1, f"Đơn vị: {phong_ban}"); set_style(ws.cell(2, 1), font=font_subtitle)
         
@@ -164,10 +175,11 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             day_fills[col_idx] = fill_color if fill_color else fill_header_default
 
         start_sum = 4 + num_days
+        # Đã loại bỏ "Tồn bù" ra khỏi bảng
         headers_sum = [
             "Hành chính", "Làm T7", "Làm CN", "Làm Lễ", 
             "Trực T7", "Trực CN", "Trực Lễ", "Trực ngày thường",
-            "Đã nghỉ bù", "Nghỉ bù còn", "Nghỉ phép", "Thai sản", "Công tác", "Nghỉ ốm", "Đi học", "Tồn bù"
+            "Đã nghỉ bù", "Nghỉ bù còn", "Nghỉ phép", "Thai sản", "Công tác", "Nghỉ ốm", "Đi học"
         ]
         for i, h in enumerate(headers_sum):
             c_idx = start_sum + i
@@ -206,15 +218,11 @@ def generate_excel_mau_cham_cong(month: int, year: int, phong_ban: str, df_cb: p
             c_truc_le = get_column_letter(start_sum+6)
             c_truc_th = get_column_letter(start_sum+7)
             c_da_nghi = get_column_letter(start_sum+8)
-            c_ton_bu  = get_column_letter(start_sum+15)
 
             ton_dau_ky = nv.get("ton_bu_dau_ky", 0)
 
-            # Tồn bù
-            ws.cell(idx, start_sum+15, f'={ton_dau_ky} + ({c_truc_t7}{idx} + {c_truc_cn}{idx} + {c_truc_th}{idx})*1 + ({c_truc_le}{idx})*2')
-
-            # Nghỉ bù còn
-            ws.cell(idx, start_sum+9, f'=MAX(0, {c_ton_bu}{idx} - {c_da_nghi}{idx})')
+            # Tính Nghỉ bù còn trực tiếp = MAX(0, Tồn đầu kỳ + Tổng trực được bù - Đã nghỉ bù)
+            ws.cell(idx, start_sum+9, f'=MAX(0, {ton_dau_ky} + ({c_truc_t7}{idx} + {c_truc_cn}{idx} + {c_truc_th}{idx})*1 + ({c_truc_le}{idx})*2 - {c_da_nghi}{idx})')
 
             # Nghỉ phép (p/pp)
             ws.cell(idx, start_sum+10, f'={build_code_formula(all_month_cols, idx, "p", "pp")}')
@@ -383,9 +391,9 @@ def get_ordered_phong_ban_list(df_cb):
                 list_khoa.append(kp)
 
     if not list_phong and not list_khoa and not list_trung_tam:
-        list_phong = ["Phòng Kế hoạch Tổng hợp", "Phòng Tài chính Kế toán", "Phòng Nhân Sự - Tổng Hợp", "Phòng Tổ chức Cán bộ"]
-        list_khoa = ["Khoa Cấp cứu", "Khoa Khám bệnh", "Khoa Ngoại tổng hợp", "Khoa Nội tổng hợp"]
-        list_trung_tam = ["Trung tâm Đột quỵ", "Trung tâm Y học hạt nhân"]
+        list_phong = ["Phòng Công nghệ thông tin", "Phòng Kế hoạch Tổng hợp", "Phòng Tài chính Kế toán", "Phòng Nhân Sự - Tổng Hợp"]
+        list_khoa = ["Khoa Cấp cứu", "Khoa Khám bệnh", "Khoa Ngoại tổng hợp"]
+        list_trung_tam = ["Trung tâm Đột quỵ"]
 
     list_phong.sort(key=lambda x: x.lower())
     list_khoa.sort(key=lambda x: x.lower())
@@ -462,7 +470,7 @@ def render_quan_ly_cham_cong(df_cb=None):
 
     # 4. Hiển thị Bảng tổng hợp
     st.markdown("---")
-    st.subheader(f"📊 Bảng tổng hợp bình bầu xếp loại lao động toàn Bệnh viện (Tháng {month:02d}/{year})")
+    st.subheader(f"📊 Bảng tổng hợp bình bầu xếp loại lao động (Tháng {month:02d}/{year})")
     
     if isinstance(df_cb, pd.DataFrame) and not df_cb.empty:
         df_abc = df_cb.copy()
@@ -470,11 +478,11 @@ def render_quan_ly_cham_cong(df_cb=None):
             df_abc = df_abc[df_abc["khoa_phong"] == don_vi_selected]
     else:
         df_abc = pd.DataFrame([
-            {"ma_can_bo": "N0883", "ho_ten": "Vũ Hồng Vân", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự"},
-            {"ma_can_bo": "N0901", "ho_ten": "Phạm Thị Quý Nhi", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự"},
-            {"ma_can_bo": "N0872", "ho_ten": "Lê Hà Minh", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Nhân sự"},
-            {"ma_can_bo": "N0648", "ho_ten": "Đỗ Thị Mai Quyên", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Nhân sự"},
-            {"ma_can_bo": "N0591", "ho_ten": "Phạm Thị Thanh Hương", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Nhân sự"}
+            {"ma_can_bo": "N0883", "ho_ten": "Vũ Hồng Vân", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Công nghệ thông tin"},
+            {"ma_can_bo": "N0901", "ho_ten": "Phạm Thị Quý Nhi", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Công nghệ thông tin"},
+            {"ma_can_bo": "N0872", "ho_ten": "Lê Hà Minh", "chuc_vu": "Bác sĩ", "khoa_phong": "Phòng Công nghệ thông tin"},
+            {"ma_can_bo": "N0648", "ho_ten": "Đỗ Thị Mai Quyên", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Công nghệ thông tin"},
+            {"ma_can_bo": "N0591", "ho_ten": "Phạm Thị Thanh Hương", "chuc_vu": "Chuyên viên", "khoa_phong": "Phòng Công nghệ thông tin"}
         ])
 
     records = []
@@ -484,7 +492,7 @@ def render_quan_ly_cham_cong(df_cb=None):
             "Mã NV": row.get("ma_can_bo", f"NV{idx+1:03d}"),
             "Họ và tên": row.get("ho_ten", ""),
             "Chức vụ": row.get("chuc_vu", "Nhân viên"),
-            "Đơn vị / Khoa phòng": row.get("khoa_phong", "Phòng Nhân sự"),
+            "Đơn vị / Khoa phòng": row.get("khoa_phong", "Phòng Công nghệ thông tin"),
             "Hành chính": 22.0,
             "Làm T7": 0.0,
             "Làm CN": 0.0,
@@ -500,7 +508,7 @@ def render_quan_ly_cham_cong(df_cb=None):
             "Công tác (C/CC)": 0,
             "Đi học (H/HH)": 0,
             "Xếp loại": "A",
-            "Tồn bù còn lại": 0
+            "Nghỉ bù còn lại": 0
         })
 
     df_summary = pd.DataFrame(records)
